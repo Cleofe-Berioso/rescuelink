@@ -1,0 +1,110 @@
+.animated-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(165deg, #f8fafc 0%, #f1f5f9 45%, #eef2ff 100%);
+}
+
+.animated-bg__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 20%, transparent 75%);
+}
+
+.animated-bg__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  animation: blob-drift 22s ease-in-out infinite;
+}
+
+.animated-bg__blob--red {
+  width: 420px;
+  height: 420px;
+  top: -8%;
+  right: -5%;
+  background: radial-gradient(circle, rgba(220, 38, 38, 0.35), transparent 70%);
+  animation-delay: 0s;
+}
+
+.animated-bg__blob--orange {
+  width: 360px;
+  height: 360px;
+  bottom: 10%;
+  left: -6%;
+  background: radial-gradient(circle, rgba(234, 88, 12, 0.28), transparent 70%);
+  animation-delay: -7s;
+  animation-duration: 26s;
+}
+
+.animated-bg__blob--blue {
+  width: 480px;
+  height: 480px;
+  top: 35%;
+  left: 40%;
+  background: radial-gradient(circle, rgba(67, 56, 202, 0.22), transparent 70%);
+  animation-delay: -14s;
+  animation-duration: 30s;
+}
+
+.animated-bg__pulse {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(220, 38, 38, 0.12);
+  animation: pulse-ring 8s ease-out infinite;
+}
+
+.animated-bg__pulse--1 {
+  width: 120px;
+  height: 120px;
+  top: 18%;
+  left: 12%;
+}
+
+.animated-bg__pulse--2 {
+  width: 80px;
+  height: 80px;
+  bottom: 22%;
+  right: 18%;
+  animation-delay: -4s;
+}
+
+@keyframes blob-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -20px) scale(1.05);
+  }
+  66% {
+    transform: translate(-20px, 25px) scale(0.95);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-bg__blob,
+  .animated-bg__pulse {
+    animation: none;
+  }
+}

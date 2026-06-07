@@ -1,0 +1,48 @@
+.command-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #050b14;
+}
+
+.command-bg__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  transform: scale(1.02);
+}
+
+.command-bg__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 11, 20, 0.35) 0%, rgba(5, 11, 20, 0.55) 100%),
+    rgba(5, 11, 20, 0.18);
+}
+
+.command-bg__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 75% 65% at 50% 48%,
+    transparent 15%,
+    rgba(5, 11, 20, 0.72) 100%
+  );
+}
+
+@media (max-width: 768px) {
+  .command-bg__photo {
+    object-position: center 40%;
+  }
+
+  .command-bg__overlay {
+    background:
+      linear-gradient(180deg, rgba(5, 11, 20, 0.45) 0%, rgba(5, 11, 20, 0.65) 100%),
+      rgba(5, 11, 20, 0.28);
+  }
+}
