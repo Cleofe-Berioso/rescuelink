@@ -9,6 +9,12 @@ from .models import EmergencyReport, IncidentResponse, IncidentStatusHistory
 User = get_user_model()
 
 
+def _list_results(response_data):
+	if isinstance(response_data, list):
+		return response_data
+	return response_data.get("results", [])
+
+
 class MultiUnitRespondTests(APITestCase):
 	def setUp(self):
 		for role in ("CITIZEN", "DRRM", "BFP", "POLICE", "ADMIN"):
@@ -240,7 +246,7 @@ class AdminApiTests(APITestCase):
 		self.client.force_authenticate(user=self.admin)
 		res = self.client.get("/api/admin/users/")
 		self.assertEqual(res.status_code, status.HTTP_200_OK)
-		usernames = {item["username"] for item in res.data}
+		usernames = {item["username"] for item in _list_results(res.data)}
 		self.assertIn("admin", usernames)
 		self.assertIn("drrm", usernames)
 
@@ -281,7 +287,7 @@ class AdminApiTests(APITestCase):
 		self.client.force_authenticate(user=self.admin)
 		res = self.client.get("/api/admin/categories/")
 		self.assertEqual(res.status_code, status.HTTP_200_OK)
-		self.assertGreaterEqual(len(res.data), 1)
+		self.assertGreaterEqual(len(_list_results(res.data)), 1)
 
 	def test_admin_can_create_category(self):
 		self.client.force_authenticate(user=self.admin)
@@ -359,7 +365,7 @@ class CitizenReportResponsesTests(APITestCase):
 		self.client.force_authenticate(user=self.citizen)
 		res = self.client.get("/api/reports/")
 		self.assertEqual(res.status_code, status.HTTP_200_OK)
-		report = next(item for item in res.data if item["id"] == self.report.id)
+		report = next(item for item in _list_results(res.data) if item["id"] == self.report.id)
 		self.assertEqual(len(report["responses"]), 1)
 		self.assertEqual(report["responses"][0]["unit"], "BFP")
 		self.assertEqual(report["responses"][0]["status"], "ACCEPTED")
@@ -370,6 +376,132 @@ class CitizenReportResponsesTests(APITestCase):
 		self.client.force_authenticate(user=self.citizen)
 		res = self.client.get("/api/responses/")
 		self.assertEqual(res.status_code, status.HTTP_200_OK)
-		report_ids = {item["emergency_report"] for item in res.data}
+		report_ids = {item["emergency_report"] for item in _list_results(res.data)}
 		self.assertIn(self.report.id, report_ids)
 		self.assertNotIn(self.other_report.id, report_ids)
+
+
+class SecurityTests(APITestCase):
+	def setUp(self):
+		for role in ("CITIZEN", "DRRM", "BFP", "POLICE", "ADMIN"):
+			Group.objects.get_or_create(name=role)
+
+		self.citizen = User.objects.create_user(
+			username="citizen",
+			password="citizen1234",
+		)
+		self.citizen.groups.add(Group.objects.get(name="CITIZEN"))
+
+		self.other_citizen = User.objects.create_user(
+			username="citizen2",
+			password="citizen1234",
+		)
+		self.other_citizen.groups.add(Group.objects.get(name="CITIZEN"))
+
+		self.bfp = User.objects.create_user(
+			username="bfp",
+			password="bfp1234",
+			is_staff=True,
+		)
+		self.bfp.groups.add(Group.objects.get(name="BFP"))
+
+		self.report = EmergencyReport.objects.create(
+			reporter=self.citizen,
+			emergency_description="Test report",
+			latitude=14.5995,
+			longitude=120.9842,
+			contact_number="09170000001",
+		)
+
+		self.other_report = EmergencyReport.objects.create(
+			reporter=self.other_citizen,
+			emergency_description="Other report",
+			latitude=14.5995,
+			longitude=120.9842,
+			contact_number="09170000002",
+		)
+
+	def test_citizen_cannot_retrieve_other_citizen_report(self):
+		self.client.force_authenticate(user=self.citizen)
+		res = self.client.get(f"/api/reports/{self.other_report.id}/")
+		self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+	def test_citizen_cannot_update_status(self):
+		self.client.force_authenticate(user=self.citizen)
+		res = self.client.post(
+			f"/api/reports/{self.report.id}/update_status/",
+			{"status": EmergencyReport.STATUS_DISPATCHED},
+			format="json",
+		)
+		self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_citizen_cannot_respond_to_report(self):
+		self.client.force_authenticate(user=self.citizen)
+		res = self.client.post(
+			f"/api/reports/{self.report.id}/respond/",
+			{"response_unit": "BFP"},
+			format="json",
+		)
+		self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_citizen_cannot_patch_report(self):
+		self.client.force_authenticate(user=self.citizen)
+		res = self.client.patch(
+			f"/api/reports/{self.report.id}/",
+			{"emergency_description": "Hacked"},
+			format="json",
+		)
+		self.assertEqual(res.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+	def test_sql_injection_in_description_stored_as_plain_text(self):
+		payload = "' OR '1'='1; DROP TABLE api_emergencyreport; --"
+		self.client.force_authenticate(user=self.citizen)
+		res = self.client.post(
+			"/api/reports/",
+			{
+				"emergency_description": payload,
+				"latitude": "14.5995000",
+				"longitude": "120.9842000",
+				"contact_number": "09170000003",
+			},
+			format="json",
+		)
+		self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+		self.assertTrue(EmergencyReport.objects.filter(pk=res.data["id"]).exists())
+		created = EmergencyReport.objects.get(pk=res.data["id"])
+		self.assertEqual(created.emergency_description, payload)
+
+	def test_malicious_admin_search_does_not_break_api(self):
+		admin = User.objects.create_user(
+			username="adminsec",
+			password="admin1234",
+			is_staff=True,
+			is_superuser=True,
+		)
+		admin.groups.add(Group.objects.get(name="ADMIN"))
+		self.client.force_authenticate(user=admin)
+		res = self.client.get(
+			"/api/admin/users/",
+			{"search": "' OR '1'='1; DROP TABLE auth_user; --"},
+		)
+		self.assertEqual(res.status_code, status.HTTP_200_OK)
+		self.assertTrue(User.objects.filter(username="adminsec").exists())
+
+	def test_invalid_status_filter_rejected(self):
+		self.client.force_authenticate(user=self.bfp)
+		res = self.client.get("/api/reports/", {"status": "INVALID; DROP TABLE"})
+		self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+	def test_invalid_ordering_rejected(self):
+		self.client.force_authenticate(user=self.bfp)
+		res = self.client.get("/api/reports/", {"ordering": "id; DROP TABLE"})
+		self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+	def test_login_error_is_generic(self):
+		res = self.client.post(
+			"/api/auth/token/",
+			{"username": "nobody", "password": "wrongpassword"},
+			format="json",
+		)
+		self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+		self.assertEqual(res.data["detail"], "Invalid username or password.")

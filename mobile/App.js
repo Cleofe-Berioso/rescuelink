@@ -25,17 +25,28 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Django API base URL for Expo Go on a physical device.
-//
-// You need a SEPARATE ngrok tunnel to Django (port 8000), NOT the Expo/Metro tunnel:
-//   Terminal 1: cd backend && python manage.py runserver
-//   Terminal 2: ngrok http 8000
-//   Paste the ngrok HTTPS origin below + "/api"
-//
-// WRONG: Expo QR tunnel URL — returns HTML (<title>mobile</title>), not JSON tokens.
-// RIGHT: ngrok → http://127.0.0.1:8000  →  https://xxxx.ngrok-free.dev/api
-const API_BASE_URL = "https://supereffectively-mycostatic-lilla.ngrok-free.dev/api";
+// Django API base URL — set EXPO_PUBLIC_API_BASE_URL in .env or app.config.js extra.apiBaseUrl.
+// For Expo Go on a physical device, use an HTTPS tunnel to Django (port 8000), not the Metro tunnel.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const RATE_LIMIT_MESSAGE = "Too many requests. Please wait and try again.";
+const MAX_EMERGENCY_PHOTO_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function validateSelectedImage(asset) {
+  if (!asset) {
+    return null;
+  }
+  const mime = (asset.mimeType || "image/jpeg").toLowerCase();
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(mime)) {
+    return "Only JPEG, PNG, and WebP images are allowed.";
+  }
+  if (asset.fileSize && asset.fileSize > MAX_EMERGENCY_PHOTO_BYTES) {
+    return "Image must be 5 MB or smaller.";
+  }
+  return null;
+}
 
 const NGROK_HEADERS = {
   Accept: "application/json",
@@ -195,6 +206,9 @@ async function apiLogin(username, password) {
   console.log("LOGIN STATUS:", res.status);
 
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(RATE_LIMIT_MESSAGE);
+    }
     throw new Error(data.detail || JSON.stringify(data) || "Login failed");
   }
 
@@ -227,6 +241,9 @@ async function fetchCitizenReports(accessToken) {
   }
 
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(RATE_LIMIT_MESSAGE);
+    }
     throw new Error(data.detail || JSON.stringify(data) || "Unable to load reports.");
   }
 
@@ -239,7 +256,10 @@ async function fetchCitizenReports(accessToken) {
   return list.map(normalizeReport);
 }
 
-function formatApiError(data) {
+function formatApiError(data, status) {
+  if (status === 429) {
+    return RATE_LIMIT_MESSAGE;
+  }
   if (!data || typeof data !== "object") {
     return "Request failed.";
   }
@@ -285,7 +305,7 @@ async function apiJsonRequest(accessToken, method, path, body) {
   }
 
   if (!res.ok) {
-    throw new Error(formatApiError(data));
+    throw new Error(formatApiError(data, res.status));
   }
 
   return data;
@@ -2647,7 +2667,13 @@ export default function App() {
     });
 
     if (!result.canceled && result.assets?.length) {
-      setImage(result.assets[0]);
+      const asset = result.assets[0];
+      const imageError = validateSelectedImage(asset);
+      if (imageError) {
+        Alert.alert("Invalid image", imageError);
+        return;
+      }
+      setImage(asset);
     }
   }
 
@@ -2672,7 +2698,13 @@ export default function App() {
     });
 
     if (!result.canceled && result.assets?.length) {
-      setImage(result.assets[0]);
+      const asset = result.assets[0];
+      const imageError = validateSelectedImage(asset);
+      if (imageError) {
+        Alert.alert("Invalid image", imageError);
+        return;
+      }
+      setImage(asset);
     }
   }
 
@@ -2716,6 +2748,11 @@ export default function App() {
       form.append("address_text", address);
 
       if (image?.uri) {
+        const imageError = validateSelectedImage(image);
+        if (imageError) {
+          Alert.alert("Invalid image", imageError);
+          return;
+        }
         form.append("image", {
           uri: image.uri,
           name: `emergency-${Date.now()}.jpg`,
@@ -2734,7 +2771,10 @@ export default function App() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(JSON.stringify(data));
+        if (res.status === 429) {
+          throw new Error(RATE_LIMIT_MESSAGE);
+        }
+        throw new Error(formatApiError(data, res.status));
       }
 
       clearReportForm();

@@ -4,12 +4,14 @@ from rest_framework.response import Response
 
 from .models import EmergencyCategory
 from .permissions import IsAdminRole, STAFF_ROLES
+from .query_utils import parse_bool_param, sanitize_search_term, validate_staff_role_filter
 from .serializers import (
 	EmergencyCategorySerializer,
 	StaffUserCreateSerializer,
 	StaffUserSerializer,
 	StaffUserUpdateSerializer,
 )
+from .throttling import AdminActionRateThrottle
 
 User = get_user_model()
 
@@ -17,6 +19,7 @@ User = get_user_model()
 class StaffUserViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsAdminRole]
 	lookup_field = "pk"
+	throttle_classes = [AdminActionRateThrottle]
 
 	def get_queryset(self):
 		queryset = (
@@ -25,11 +28,11 @@ class StaffUserViewSet(viewsets.ModelViewSet):
 			.order_by("-date_joined")
 		)
 
-		role = self.request.query_params.get("role")
-		if role and role in STAFF_ROLES:
+		role = validate_staff_role_filter(self.request.query_params.get("role"))
+		if role:
 			queryset = queryset.filter(groups__name=role)
 
-		search = self.request.query_params.get("search", "").strip()
+		search = sanitize_search_term(self.request.query_params.get("search", ""))
 		if search:
 			queryset = queryset.filter(username__icontains=search) | queryset.filter(
 				email__icontains=search
@@ -37,9 +40,9 @@ class StaffUserViewSet(viewsets.ModelViewSet):
 				last_name__icontains=search
 			)
 
-		active = self.request.query_params.get("is_active")
-		if active in ("true", "false"):
-			queryset = queryset.filter(is_active=(active == "true"))
+		active = parse_bool_param(self.request.query_params.get("is_active"))
+		if active is not None:
+			queryset = queryset.filter(is_active=active)
 
 		return queryset
 
@@ -86,12 +89,13 @@ class EmergencyCategoryViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsAdminRole]
 	queryset = EmergencyCategory.objects.all().order_by("name")
 	serializer_class = EmergencyCategorySerializer
+	throttle_classes = [AdminActionRateThrottle]
 
 	def get_queryset(self):
 		queryset = super().get_queryset()
-		active = self.request.query_params.get("is_active")
-		if active in ("true", "false"):
-			queryset = queryset.filter(is_active=(active == "true"))
+		active = parse_bool_param(self.request.query_params.get("is_active"))
+		if active is not None:
+			queryset = queryset.filter(is_active=active)
 		return queryset
 
 	def destroy(self, request, *args, **kwargs):

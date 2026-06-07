@@ -12,9 +12,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
+
+def _csv_env(name, default=""):
+    raw = os.environ.get(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _env_bool(name, default="False"):
+    return os.environ.get(name, default).lower() in ("true", "1", "yes")
+
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-change-me-in-production")
-DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
-ALLOWED_HOSTS = ["*"]
+DEBUG = _env_bool("DEBUG", "True")
+
+ALLOWED_HOSTS = _csv_env("ALLOWED_HOSTS")
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost"] if DEBUG else []
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -97,7 +110,18 @@ STATIC_URL = "static/"
 MEDIA_URL = "/uploads/"
 MEDIA_ROOT = BASE_DIR.parent / ".uploads"
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG and not _csv_env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGINS = _csv_env("CORS_ALLOWED_ORIGINS")
+
+CSRF_TRUSTED_ORIGINS = _csv_env("CSRF_TRUSTED_ORIGINS")
+
+MAX_EMERGENCY_PHOTO_BYTES = int(
+    os.environ.get("MAX_EMERGENCY_PHOTO_BYTES", str(5 * 1024 * 1024))
+)
+MAX_EMERGENCY_PHOTOS = int(os.environ.get("MAX_EMERGENCY_PHOTOS", "5"))
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_EMERGENCY_PHOTO_BYTES + (512 * 1024)
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_EMERGENCY_PHOTO_BYTES
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -106,11 +130,31 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": int(os.environ.get("API_PAGE_SIZE", "50")),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.environ.get("THROTTLE_ANON", "60/hour"),
+        "user": os.environ.get("THROTTLE_USER", "600/hour"),
+        "login": os.environ.get("THROTTLE_LOGIN", "10/minute"),
+        "registration": os.environ.get("THROTTLE_REGISTRATION", "5/hour"),
+        "report_create": os.environ.get("THROTTLE_REPORT_CREATE", "10/hour"),
+        "image_upload": os.environ.get("THROTTLE_IMAGE_UPLOAD", "20/hour"),
+        "staff_action": os.environ.get("THROTTLE_STAFF_ACTION", "120/hour"),
+        "admin_action": os.environ.get("THROTTLE_ADMIN_ACTION", "120/hour"),
+    },
+    "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
 }
 
+JWT_ACCESS_HOURS = int(os.environ.get("JWT_ACCESS_TOKEN_HOURS", "1"))
+JWT_REFRESH_DAYS = int(os.environ.get("JWT_REFRESH_TOKEN_DAYS", "7"))
+
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=6),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=JWT_ACCESS_HOURS),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=JWT_REFRESH_DAYS),
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -121,6 +165,40 @@ SUPABASE_STORAGE_REGION = os.environ.get("SUPABASE_STORAGE_REGION", "ap-northeas
 SUPABASE_S3_ACCESS_KEY_ID = os.environ.get("SUPABASE_S3_ACCESS_KEY_ID", "")
 SUPABASE_S3_SECRET_ACCESS_KEY = os.environ.get("SUPABASE_S3_SECRET_ACCESS_KEY", "")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "emergency-photos")
-MAX_EMERGENCY_PHOTO_BYTES = int(
-    os.environ.get("MAX_EMERGENCY_PHOTO_BYTES", str(5 * 1024 * 1024))
-)
+
+DJANGO_ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/").strip("/") + "/"
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", "True")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", "True")
+    SECURE_HSTS_PRELOAD = _env_bool("SECURE_HSTS_PRELOAD", "True")
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {
+            "format": "{levelname} {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "rescuelink.security": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

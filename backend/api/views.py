@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import CitizenProfile, EmergencyReport, IncidentResponse, IncidentStatusHistory
+from .permissions import IsStaffUser
+from .query_utils import validate_report_ordering, validate_report_status_filter
 from .serializers import (
 	CitizenProfileSerializer,
 	CitizenRegisterSerializer,
@@ -23,6 +25,11 @@ from .report_status import (
 	status_after_unit_accept,
 	validate_status_transition,
 )
+from .throttling import (
+	RegistrationRateThrottle,
+	ReportCreateRateThrottle,
+	StaffActionRateThrottle,
+)
 
 
 @api_view(["GET"])
@@ -33,23 +40,44 @@ def health(request):
 
 class RescueLinkTokenObtainPairView(TokenObtainPairView):
 	serializer_class = RescueLinkTokenObtainPairSerializer
+	permission_classes = [permissions.AllowAny]
+	throttle_classes = []  # set in get_throttles
+
+	def get_throttles(self):
+		from .throttling import LoginRateThrottle
+
+		return [LoginRateThrottle()]
 
 
 class EmergencyReportViewSet(viewsets.ModelViewSet):
 	queryset = EmergencyReport.objects.select_related("reporter").prefetch_related("responses").all()
 	serializer_class = EmergencyReportSerializer
+	http_method_names = ["get", "post", "head", "options"]
 
 	def get_permissions(self):
-		if self.action in ["list", "retrieve", "respond", "update_status", "image"]:
-			return [permissions.IsAuthenticated()]
-		if self.action in ["create"]:
-			return [permissions.IsAuthenticated()]
+		if self.action in ["respond", "update_status"]:
+			return [permissions.IsAuthenticated(), IsStaffUser()]
 		return [permissions.IsAuthenticated()]
+
+	def get_throttles(self):
+		if self.action == "create":
+			return [ReportCreateRateThrottle()]
+		if self.action in ("respond", "update_status"):
+			return [StaffActionRateThrottle()]
+		return super().get_throttles()
 
 	def get_queryset(self):
 		user = self.request.user
 		queryset = EmergencyReport.objects.select_related("reporter").prefetch_related("responses").all()
 		if user.is_staff:
+			status_filter = validate_report_status_filter(
+				self.request.query_params.get("status")
+			)
+			if status_filter:
+				queryset = queryset.filter(status=status_filter)
+			ordering = validate_report_ordering(self.request.query_params.get("ordering"))
+			if ordering:
+				queryset = queryset.order_by(ordering)
 			return queryset
 		return queryset.filter(reporter=user)
 
@@ -113,7 +141,7 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 	def respond(self, request, pk=None):
 		report = self.get_object()
 		response_unit = request.data.get("response_unit")
-		response_notes = request.data.get("response_notes", "")
+		response_notes = str(request.data.get("response_notes", ""))[:2000]
 
 		if response_unit not in [choice[0] for choice in IncidentResponse.UNIT_CHOICES]:
 			return Response({"detail": "Invalid response_unit."}, status=status.HTTP_400_BAD_REQUEST)
@@ -178,7 +206,11 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 	def update_status(self, request, pk=None):
 		report = self.get_object()
 		new_status = request.data.get("status")
-		remarks = request.data.get("remarks", "")
+		remarks = str(request.data.get("remarks", ""))[:2000]
+
+		valid_statuses = {choice[0] for choice in EmergencyReport.STATUS_CHOICES}
+		if new_status not in valid_statuses:
+			return Response({"detail": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
 
 		valid, error_message = validate_status_transition(report.status, new_status)
 		if not valid:
@@ -203,6 +235,13 @@ class IncidentStatusHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 	queryset = IncidentStatusHistory.objects.select_related("updated_by", "emergency_report").all()
 	serializer_class = IncidentStatusHistorySerializer
 	permission_classes = [permissions.IsAuthenticated]
+
+	def get_queryset(self):
+		queryset = super().get_queryset()
+		user = self.request.user
+		if user.is_staff:
+			return queryset
+		return queryset.filter(emergency_report__reporter=user)
 
 
 class IncidentResponseViewSet(viewsets.ReadOnlyModelViewSet):
@@ -268,6 +307,7 @@ class ChangePasswordView(APIView):
 
 class CitizenRegisterView(APIView):
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [RegistrationRateThrottle]
 
 	def post(self, request):
 		serializer = CitizenRegisterSerializer(data=request.data)

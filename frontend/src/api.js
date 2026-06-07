@@ -6,9 +6,21 @@ import {
   updateStoredTokens,
 } from "./utils/authStorage";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-function formatApiError(data) {
+const RATE_LIMIT_MESSAGE = "Too many requests. Please wait and try again.";
+
+function unwrapList(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return data?.results || [];
+}
+
+function formatApiError(data, status) {
+  if (status === 429) {
+    return RATE_LIMIT_MESSAGE;
+  }
   if (!data || typeof data !== "object") {
     return "Request failed.";
   }
@@ -27,12 +39,12 @@ function formatApiError(data) {
 
 async function parseErrorResponse(res, fallback) {
   const body = await res.json().catch(() => ({}));
-  throw new Error(formatApiError(body) || fallback);
+  throw new Error(formatApiError(body, res.status) || fallback);
 }
 
 export async function formatApiErrorFromResponse(res, fallback) {
   const body = await res.json().catch(() => ({}));
-  return formatApiError(body) || fallback;
+  return formatApiError(body, res.status) || fallback;
 }
 
 export async function login(username, password) {
@@ -44,7 +56,7 @@ export async function login(username, password) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || "Login failed.");
+    throw new Error(formatApiError(body, res.status) || "Login failed.");
   }
 
   return res.json();
@@ -109,10 +121,14 @@ export async function fetchReports(accessToken) {
   });
 
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(RATE_LIMIT_MESSAGE);
+    }
     throw new Error("Failed to load reports.");
   }
 
-  return res.json();
+  const data = await res.json();
+  return unwrapList(data);
 }
 
 export async function createReport(accessToken, payload) {
@@ -134,7 +150,7 @@ export async function createReport(accessToken, payload) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(JSON.stringify(body) || "Failed to create report.");
+    throw new Error(formatApiError(body, res.status) || "Failed to create report.");
   }
 
   return res.json();
@@ -197,16 +213,28 @@ export async function fetchResponses(accessToken) {
   const res = await fetch(`${API_BASE_URL}/responses/`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error("Failed to load response records.");
-  return res.json();
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(RATE_LIMIT_MESSAGE);
+    }
+    throw new Error("Failed to load response records.");
+  }
+  const data = await res.json();
+  return unwrapList(data);
 }
 
 export async function fetchStatusHistory(accessToken) {
   const res = await fetch(`${API_BASE_URL}/status-history/`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error("Failed to load activity logs.");
-  return res.json();
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(RATE_LIMIT_MESSAGE);
+    }
+    throw new Error("Failed to load activity logs.");
+  }
+  const data = await res.json();
+  return unwrapList(data);
 }
 
 export { API_BASE_URL };

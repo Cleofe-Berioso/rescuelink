@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -5,12 +7,14 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from PIL import Image
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import CitizenProfile, EmergencyCategory, EmergencyReport, IncidentResponse, IncidentStatusHistory
 from .storage import ALLOWED_EMERGENCY_PHOTO_CONTENT_TYPES
 
 UserModel = get_user_model()
+security_logger = logging.getLogger("rescuelink.security")
 
 ROLE_PRIORITY = ("ADMIN", "DRRM", "BFP", "POLICE", "CITIZEN")
 STAFF_ROLES = ("ADMIN", "DRRM", "BFP", "POLICE")
@@ -33,7 +37,23 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RescueLinkTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        data = super().validate(attrs)
+        request = self.context.get("request")
+        username = attrs.get(self.username_field, "")
+        try:
+            data = super().validate(attrs)
+        except AuthenticationFailed:
+            client_ip = ""
+            if request is not None:
+                client_ip = request.META.get("REMOTE_ADDR", "")
+            security_logger.warning(
+                "Failed login attempt username=%s ip=%s",
+                username,
+                client_ip,
+            )
+            raise AuthenticationFailed(
+                "Invalid username or password.",
+                code="authorization",
+            ) from None
         user = self.user
         data["user"] = {
             "id": user.id,
@@ -82,7 +102,31 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "updated_at",
             "responses",
         ]
-        read_only_fields = ["status", "created_at", "updated_at"]
+        read_only_fields = ["status", "created_at", "updated_at", "reporter"]
+
+    def validate_emergency_description(self, value):
+        text = (value or "").strip()
+        if not text:
+            raise serializers.ValidationError("Emergency description is required.")
+        if len(text) > 5000:
+            raise serializers.ValidationError("Description must be 5000 characters or fewer.")
+        return text
+
+    def validate_contact_number(self, value):
+        text = (value or "").strip()
+        if not text:
+            raise serializers.ValidationError("Contact number is required.")
+        if len(text) > 30:
+            raise serializers.ValidationError("Contact number is too long.")
+        return text
+
+    def validate_address_text(self, value):
+        if value is None:
+            return ""
+        text = str(value).strip()
+        if len(text) > 255:
+            raise serializers.ValidationError("Address must be 255 characters or fewer.")
+        return text
 
     def update(self, instance, validated_data):
         validated_data.pop("image", None)
