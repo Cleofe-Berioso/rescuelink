@@ -6,10 +6,8 @@ import {
   updateStoredTokens,
 } from "./utils/authStorage";
 
-const _rawApiBase = import.meta.env.VITE_API_BASE_URL || "";
-// Guard: if env var was accidentally set to a comma-separated list, take only the first URL.
-// A comma in a URL is invalid (RFC 3986) and can cause iOS Safari to mishandle the request.
-const API_BASE_URL = (_rawApiBase.split(",")[0].trim().replace(/\/+$/, "")) || "http://127.0.0.1:8000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 const RATE_LIMIT_MESSAGE = "Too many requests. Please wait and try again.";
 
