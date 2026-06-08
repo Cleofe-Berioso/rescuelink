@@ -129,6 +129,7 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
 
   function submit(e) {
     e.preventDefault();
+    e.stopPropagation();
     onLogin(username, password, staySignedIn);
   }
 
@@ -159,7 +160,13 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
               ))}
             </div>
 
-            <form className="command-login__form" onSubmit={submit}>
+            <form
+              className="command-login__form"
+              onSubmit={submit}
+              action="#"
+              method="post"
+              noValidate
+            >
               <h2 id="login-form-title" className="command-login__panel-title">
                 RescueLink Command Center
               </h2>
