@@ -20,6 +20,10 @@ module.exports = {
 
     ios: {
       ...(appJson.expo.ios || {}),
+
+      // Required for EAS iOS builds
+      bundleIdentifier: "com.benales122703.rescuelink",
+
       infoPlist: {
         ...(appJson.expo.ios?.infoPlist || {}),
         NSLocationWhenInUseUsageDescription:
@@ -27,20 +31,24 @@ module.exports = {
         NSCameraUsageDescription:
           "RescueLink uses the camera to attach emergency photos to your reports.",
         NSPhotoLibraryUsageDescription:
-          "RescueLink uses your photo library to attach emergency photos to your reports.",
+          "RescueLink uses your photo library to attach photos to emergency reports.",
       },
     },
 
     android: {
       ...(appJson.expo.android || {}),
+
+      // Required for Android builds
       package:
         appJson.expo.android?.package || "com.benales122703.rescuelink",
+
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "CAMERA",
         "READ_MEDIA_IMAGES",
       ],
+
       config: {
         ...(appJson.expo.android?.config || {}),
         googleMaps: {

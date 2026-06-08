@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:3000/api"
+        "EXPO_PUBLIC_API_BASE_URL": "hhttp://127.0.0.1:8000/api"
       }
     },
     "preview": {
@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://rescuelink-backend.onrender.com/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://rescuelink-backend-biwl.onrender.com/api"
       }
     },
     "production": {
@@ -24,7 +24,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://rescuelink-backend.onrender.com/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://rescuelink-backend-biwl.onrender.com/api"
       }
     }
   },
