@@ -49,3 +49,4 @@ pnpm-debug.log*
 # Local AI/tooling (optional project helpers)
 .agents/
 skills-lock.json
+.vercel
