@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -38,7 +38,10 @@ from .throttling import (
 
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([])
 def health(request):
+	# No database queries — keep this view as lightweight as possible.
+	# Render calls this endpoint frequently; throttling must never apply here.
 	return Response({"ok": True, "service": "rescuelink-api"})
 
 
