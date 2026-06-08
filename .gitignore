@@ -15,6 +15,9 @@ backend/.uploads/
 uploads/
 media/
 backend/staticfiles/
+.render-service-id
+.render-env-tmp.json
+.render-env.json
 *.sqlite3
 
 # Node / frontend

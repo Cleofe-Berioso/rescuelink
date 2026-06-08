@@ -27,7 +27,7 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-
 
 // Django API base URL — set EXPO_PUBLIC_API_BASE_URL in .env or app.config.js extra.apiBaseUrl.
 // For Expo Go on a physical device, use an HTTPS tunnel to Django (port 8000), not the Metro tunnel.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "https://supereffectively-mycostatic-lilla.ngrok-free.dev";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "https://rescuelink-backend-biwl.onrender.com/api";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 const RATE_LIMIT_MESSAGE = "Too many requests. Please wait and try again.";

@@ -27,9 +27,13 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-change-me-in-producti
 DEBUG = _env_bool("DEBUG", "True")
 
 ALLOWED_HOSTS = _csv_env("ALLOWED_HOSTS")
-if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost"] if DEBUG else []
 
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = [
+        "127.0.0.1",
+        "localhost",
+        "rescuelink-backend-biwl.onrender.com",
+    ]
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
