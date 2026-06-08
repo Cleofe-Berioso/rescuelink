@@ -166,6 +166,18 @@ SUPABASE_S3_ACCESS_KEY_ID = os.environ.get("SUPABASE_S3_ACCESS_KEY_ID", "")
 SUPABASE_S3_SECRET_ACCESS_KEY = os.environ.get("SUPABASE_S3_SECRET_ACCESS_KEY", "")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "emergency-photos")
 
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
+OPENROUTER_FALLBACK_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL", "nvidia/nemotron-3-super:free")
+OPENROUTER_SAFETY_MODEL = os.environ.get("OPENROUTER_SAFETY_MODEL", "nvidia/nemotron-3.5-content-safety:free")
+OPENROUTER_SITE_URL = os.environ.get("OPENROUTER_SITE_URL", "http://localhost:5173")
+OPENROUTER_APP_NAME = os.environ.get("OPENROUTER_APP_NAME", "RescueLink")
+AI_PRIORITY_ENABLED = _env_bool("AI_PRIORITY_ENABLED", "True")
+AI_ABUSE_DETECTION_ENABLED = _env_bool("AI_ABUSE_DETECTION_ENABLED", "True")
+AI_PRIORITY_TIMEOUT_SECONDS = int(os.environ.get("AI_PRIORITY_TIMEOUT_SECONDS", "20"))
+AI_REVIEW_THRESHOLD = int(os.environ.get("AI_REVIEW_THRESHOLD", "70"))
+AI_AUTO_SUSPEND_THRESHOLD = int(os.environ.get("AI_AUTO_SUSPEND_THRESHOLD", "90"))
+
 DJANGO_ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/").strip("/") + "/"
 
 if not DEBUG:

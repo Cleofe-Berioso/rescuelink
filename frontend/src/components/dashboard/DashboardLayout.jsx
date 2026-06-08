@@ -74,6 +74,9 @@ export default function DashboardLayout({
   onViewChange,
   onSignOut,
   children,
+  pageTitle,
+  pageTagline,
+  headerActions,
 }) {
   const [navOpen, setNavOpen] = useState(false);
 
@@ -137,13 +140,16 @@ export default function DashboardLayout({
             </button>
             <div>
               <p className="dash-header__eyebrow">Multi-Agency Emergency Coordination</p>
-              <h1 className="dash-header__title">{config.headerSubtitle}</h1>
-              <p className="dash-header__tagline">{config.tagline}</p>
+              <h1 className="dash-header__title">{pageTitle || config.headerSubtitle}</h1>
+              <p className="dash-header__tagline">{pageTagline || config.tagline}</p>
             </div>
           </div>
-          <div className="dash-header__status">
-            <span className="live-dot" aria-hidden="true" />
-            Live monitoring · manual response only
+          <div className="dash-header__actions">
+            {headerActions}
+            <div className="dash-header__status">
+              <span className="live-dot" aria-hidden="true" />
+              Live monitoring · manual response only
+            </div>
           </div>
         </header>
         <div className="dash-content">{children}</div>

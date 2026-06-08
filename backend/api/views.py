@@ -20,6 +20,10 @@ from .serializers import (
 	RescueLinkTokenObtainPairSerializer,
 )
 from .storage import delete_emergency_photo, download_emergency_photo, upload_emergency_photo
+from .request_utils import get_client_ip
+from .services.ai_priority import apply_ai_priority_to_report
+from .services.abuse_detection import is_profile_suspended, process_report_abuse
+from .services.abuse_rules import compute_image_content_hash
 from .report_status import (
 	can_accept_respond,
 	status_after_unit_accept,
@@ -82,9 +86,23 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 		return queryset.filter(reporter=user)
 
 	def create(self, request, *args, **kwargs):
+		profile = get_or_create_citizen_profile(request.user)
+		if is_profile_suspended(profile):
+			return Response(
+				{
+					"detail": (
+						"Your account is temporarily restricted due to suspicious activity. "
+						"Please contact support or wait for admin review."
+					)
+				},
+				status=status.HTTP_403_FORBIDDEN,
+			)
+
 		serializer = self.get_serializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
 		image_file = serializer.validated_data.pop("image", None)
+		client_ip = get_client_ip(request)
+		image_hash = ""
 
 		with transaction.atomic():
 			report = serializer.save(reporter=request.user)
@@ -98,6 +116,10 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 		object_key = None
 		if image_file:
 			try:
+				image_file.seek(0)
+				image_bytes = image_file.read()
+				image_hash = compute_image_content_hash(image_bytes)
+				image_file.seek(0)
 				object_key = upload_emergency_photo(
 					report.id,
 					image_file,
@@ -105,7 +127,8 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 					image_file.name,
 				)
 				report.image = object_key
-				report.save(update_fields=["image", "updated_at"])
+				report.image_content_hash = image_hash
+				report.save(update_fields=["image", "image_content_hash", "updated_at"])
 			except Exception as exc:
 				if object_key:
 					try:
@@ -117,6 +140,21 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 					{"image": "Failed to upload image. Please try again."}
 				) from exc
 
+		if client_ip:
+			profile.last_activity_ip = client_ip
+			profile.save(update_fields=["last_activity_ip", "updated_at"])
+
+		try:
+			apply_ai_priority_to_report(report)
+		except Exception:
+			pass
+
+		try:
+			process_report_abuse(report, client_ip=client_ip, image_hash=image_hash)
+		except Exception:
+			pass
+
+		report.refresh_from_db()
 		output = self.get_serializer(report)
 		headers = self.get_success_headers(output.data)
 		return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -310,9 +348,16 @@ class CitizenRegisterView(APIView):
 	throttle_classes = [RegistrationRateThrottle]
 
 	def post(self, request):
+		from .services.abuse_detection import process_registration_abuse
+
 		serializer = CitizenRegisterSerializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
-		serializer.save()
+		user = serializer.save()
+		profile = get_or_create_citizen_profile(user)
+		try:
+			process_registration_abuse(profile, client_ip=get_client_ip(request))
+		except Exception:
+			pass
 		return Response(
 			{"detail": "Account created successfully. Please sign in."},
 			status=status.HTTP_201_CREATED,

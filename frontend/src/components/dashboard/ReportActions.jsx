@@ -30,8 +30,11 @@ export default function ReportActions({
   roleLabel,
   existingResponses = [],
   onChanged,
+  mode = "full",
+  showUnitPanel = true,
 }) {
   const unit = defaultUnit;
+  const isMonitorMode = mode === "monitor";
   const [status, setStatus] = useState(report.status);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,21 +130,19 @@ export default function ReportActions({
   const acceptLabel = busy
     ? "Working…"
     : unitAlreadyResponded
-      ? `Already Accepted by ${displayUnitName(unit)}`
+      ? `Already responded (${displayUnitName(unit)})`
       : "Accept / Respond";
 
   return (
     <div className="report-actions">
-      <UnitResponsesPanel responses={existingResponses} />
+      {showUnitPanel ? (
+        <UnitResponsesPanel responses={existingResponses} currentUnit={unit} report={report} />
+      ) : null}
 
+      {!isMonitorMode ? (
       <div className="report-actions__section">
-        <p className="report-actions__heading">Manual response selection</p>
-        <p className="report-actions__your-unit">
-          Your unit: <strong>{displayUnitName(unit)}</strong>
-        </p>
         <p className="report-actions__hint">
-          Review photo, location, and details before accepting. Multiple units may respond to the same
-          incident without changing the main status backward.
+          
         </p>
         {respondBlocked ? (
           <p className="report-actions__blocked" role="status">
@@ -151,7 +152,7 @@ export default function ReportActions({
         ) : null}
         {!respondBlocked && unitAlreadyResponded ? (
           <p className="report-actions__notice" role="status">
-            Your unit has already accepted this incident. You can update status or add follow-up notes
+            Accepted by your unit ({displayUnitName(unit)}). You can update status or add follow-up notes
             below.
           </p>
         ) : null}
@@ -197,6 +198,12 @@ export default function ReportActions({
           ) : null}
         </div>
       </div>
+      ) : (
+        <p className="report-actions__hint">
+          Monitoring incident handled by {displayUnitName(unit)}. Use status update below to progress or
+          close this report. To accept new incidents, go to Emergency Reports.
+        </p>
+      )}
 
       <div className="report-actions__section">
         <p className="report-actions__heading">Status update</p>
@@ -207,7 +214,12 @@ export default function ReportActions({
           </p>
         ) : report.status === "IN_PROGRESS" ? (
           <p className="report-actions__hint">
-            Response In Progress. You may mark this incident as Resolved or Cancelled.
+            {isMonitorMode ? "Incident Status: In Progress" : "Response In Progress"}. You may mark this
+            incident as Resolved or Cancelled.
+          </p>
+        ) : isMonitorMode ? (
+          <p className="report-actions__hint">
+            Incident Status: {STATUS_LABELS[report.status] || report.status}
           </p>
         ) : null}
         <div className="report-actions__group">

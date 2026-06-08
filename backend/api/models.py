@@ -3,6 +3,52 @@ from django.db import models
 
 
 class EmergencyReport(models.Model):
+	LEVEL_LOW = "LOW"
+	LEVEL_MEDIUM = "MEDIUM"
+	LEVEL_HIGH = "HIGH"
+	LEVEL_CRITICAL = "CRITICAL"
+
+	LEVEL_CHOICES = [
+		(LEVEL_LOW, "Low"),
+		(LEVEL_MEDIUM, "Medium"),
+		(LEVEL_HIGH, "High"),
+		(LEVEL_CRITICAL, "Critical"),
+	]
+
+	RISK_LOW = "LOW"
+	RISK_MEDIUM = "MEDIUM"
+	RISK_HIGH = "HIGH"
+	RISK_EXTREME = "EXTREME"
+
+	RISK_LEVEL_CHOICES = [
+		(RISK_LOW, "Low"),
+		(RISK_MEDIUM, "Medium"),
+		(RISK_HIGH, "High"),
+		(RISK_EXTREME, "Extreme"),
+	]
+
+	FLAG_SPAM = "SPAM"
+	FLAG_DUPLICATE_REPORT = "DUPLICATE_REPORT"
+	FLAG_REVIEW = "REVIEW"
+
+	FLAG_TYPE_CHOICES = [
+		(FLAG_SPAM, "Possible Spam"),
+		(FLAG_DUPLICATE_REPORT, "Suspicious Duplicate"),
+		(FLAG_REVIEW, "Needs Review"),
+	]
+
+	AI_STATUS_NOT_ANALYZED = "not_analyzed"
+	AI_STATUS_ANALYZED = "analyzed"
+	AI_STATUS_FAILED = "failed"
+	AI_STATUS_FALLBACK = "fallback"
+
+	AI_STATUS_CHOICES = [
+		(AI_STATUS_NOT_ANALYZED, "Not analyzed"),
+		(AI_STATUS_ANALYZED, "Analyzed"),
+		(AI_STATUS_FAILED, "Failed"),
+		(AI_STATUS_FALLBACK, "Fallback"),
+	]
+
 	STATUS_PENDING = "PENDING"
 	STATUS_VIEWED = "VIEWED"
 	STATUS_ACCEPTED = "ACCEPTED"
@@ -29,6 +75,49 @@ class EmergencyReport(models.Model):
 	contact_number = models.CharField(max_length=30)
 	address_text = models.CharField(max_length=255, blank=True)
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+	is_priority = models.BooleanField(default=False)
+	priority_level = models.CharField(
+		max_length=10, choices=LEVEL_CHOICES, default=LEVEL_LOW
+	)
+	critical_level = models.CharField(
+		max_length=10, choices=LEVEL_CHOICES, default=LEVEL_LOW
+	)
+	ai_priority_reason = models.TextField(blank=True, default="")
+	detected_incident_type = models.CharField(max_length=120, blank=True, default="")
+	suggested_units = models.JSONField(default=list, blank=True)
+	ai_confidence = models.IntegerField(null=True, blank=True)
+	ai_analyzed_at = models.DateTimeField(null=True, blank=True)
+	ai_analysis_status = models.CharField(
+		max_length=20,
+		choices=AI_STATUS_CHOICES,
+		default=AI_STATUS_NOT_ANALYZED,
+	)
+	priority_score = models.IntegerField(null=True, blank=True)
+	risk_score = models.IntegerField(null=True, blank=True)
+	risk_level = models.CharField(
+		max_length=10,
+		choices=RISK_LEVEL_CHOICES,
+		default=RISK_LOW,
+	)
+	is_flagged = models.BooleanField(default=False)
+	flag_reason = models.TextField(blank=True, default="")
+	flag_type = models.CharField(
+		max_length=30,
+		choices=FLAG_TYPE_CHOICES,
+		blank=True,
+		default="",
+	)
+	needs_verification = models.BooleanField(default=False)
+	ai_review_result = models.JSONField(default=dict, blank=True)
+	image_content_hash = models.CharField(max_length=64, blank=True, default="")
+	reviewed_at = models.DateTimeField(null=True, blank=True)
+	reviewed_by = models.ForeignKey(
+		User,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name="reviewed_reports",
+	)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
@@ -94,6 +183,18 @@ class Notification(models.Model):
 
 
 class CitizenProfile(models.Model):
+	RISK_LOW = "LOW"
+	RISK_MEDIUM = "MEDIUM"
+	RISK_HIGH = "HIGH"
+	RISK_EXTREME = "EXTREME"
+
+	RISK_LEVEL_CHOICES = [
+		(RISK_LOW, "Low"),
+		(RISK_MEDIUM, "Medium"),
+		(RISK_HIGH, "High"),
+		(RISK_EXTREME, "Extreme"),
+	]
+
 	user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="citizen_profile")
 	full_name = models.CharField(max_length=150, blank=True)
 	contact_number = models.CharField(max_length=30, blank=True)
@@ -101,6 +202,20 @@ class CitizenProfile(models.Model):
 	emergency_contact_name = models.CharField(max_length=150, blank=True)
 	emergency_contact_number = models.CharField(max_length=30, blank=True)
 	emergency_contact_relationship = models.CharField(max_length=80, blank=True)
+	is_verified = models.BooleanField(default=False)
+	is_suspended = models.BooleanField(default=False)
+	is_flagged = models.BooleanField(default=False)
+	suspension_reason = models.TextField(blank=True, default="")
+	suspension_until = models.DateTimeField(null=True, blank=True)
+	risk_score = models.IntegerField(null=True, blank=True)
+	risk_level = models.CharField(
+		max_length=10,
+		choices=RISK_LEVEL_CHOICES,
+		default=RISK_LOW,
+	)
+	last_risk_review_at = models.DateTimeField(null=True, blank=True)
+	registration_ip = models.CharField(max_length=45, blank=True, default="")
+	last_activity_ip = models.CharField(max_length=45, blank=True, default="")
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 

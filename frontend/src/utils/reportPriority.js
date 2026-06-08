@@ -71,21 +71,66 @@ export function getPriorityMatch(report, role) {
   return UNIT_KEYWORDS[role].some((keyword) => reportText(report).includes(keyword));
 }
 
+export const LEVEL_RANK = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  CRITICAL: 3,
+};
+
+export function getReportSuggestedUnits(report) {
+  if (Array.isArray(report?.suggested_units) && report.suggested_units.length) {
+    return report.suggested_units;
+  }
+  return getSuggestedUnits(report);
+}
+
 export function sortReportsWithPriority(reports, role) {
   return [...reports].sort((a, b) => {
-    const aSuggested = getSuggestedUnits(a).length;
-    const bSuggested = getSuggestedUnits(b).length;
+    const aPriority = a.is_priority ? 1 : 0;
+    const bPriority = b.is_priority ? 1 : 0;
+    const aCritical = LEVEL_RANK[(a.critical_level || "LOW").toUpperCase()] ?? 0;
+    const bCritical = LEVEL_RANK[(b.critical_level || "LOW").toUpperCase()] ?? 0;
+    const aSuggested = getReportSuggestedUnits(a).length;
+    const bSuggested = getReportSuggestedUnits(b).length;
     const aRole = getPriorityMatch(a, role) ? 1 : 0;
     const bRole = getPriorityMatch(b, role) ? 1 : 0;
 
+    if (bPriority !== aPriority) return bPriority - aPriority;
+    if (bCritical !== aCritical) return bCritical - aCritical;
     if (bRole !== aRole) return bRole - aRole;
     if (bSuggested !== aSuggested) return bSuggested - aSuggested;
     return new Date(b.created_at) - new Date(a.created_at);
   });
 }
 
-export function filterPriorityReports(reports, role) {
-  return reports.filter((report) => getPriorityMatch(report, role));
+export function filterPriorityReports(reports, _role = null) {
+  return reports.filter((report) => Boolean(report?.is_priority));
+}
+
+export function isAiPriorityReport(report) {
+  return Boolean(report?.is_priority);
+}
+
+export function hasAiAnalysis(report) {
+  const status = (report?.ai_analysis_status || "").toLowerCase();
+  return status === "analyzed" || status === "fallback" || status === "failed";
+}
+
+export function getCriticalLevelClass(level) {
+  const normalized = (level || "LOW").toUpperCase();
+  return `critical-badge critical-badge--${normalized.toLowerCase()}`;
+}
+
+export function formatPriorityLevel(level) {
+  const normalized = (level || "LOW").toUpperCase();
+  const labels = {
+    LOW: "Low",
+    MEDIUM: "Medium",
+    HIGH: "High",
+    CRITICAL: "Critical",
+  };
+  return labels[normalized] || normalized;
 }
 
 export function filterMultiAgencyReports(reports) {
@@ -97,6 +142,51 @@ export const HISTORY_STATUSES = ["RESOLVED", "CANCELLED"];
 
 export function filterActiveReports(reports) {
   return reports.filter((r) => ACTIVE_STATUSES.includes(r.status));
+}
+
+export const UNIT_ACTIVE_RESPONSE_STATUSES = ["ACCEPTED", "DISPATCHED", "IN_PROGRESS", "RESPONDING"];
+
+export function normalizeUnit(unit) {
+  return (unit || "").toUpperCase();
+}
+
+export function normalizeStatus(status) {
+  return (status || "").toUpperCase();
+}
+
+/**
+ * Reports currently handled by a specific unit — requires that unit's response record
+ * and a non-terminal incident status.
+ */
+export function filterUnitActiveReports(reports, responsesByReport, unit) {
+  const normalizedUnit = normalizeUnit(unit);
+  return reports.filter((report) => {
+    if (TERMINAL_STATUSES.includes(report.status)) {
+      return false;
+    }
+    const responses = responsesByReport[report.id] || [];
+    const unitResponse = responses.find(
+      (item) => normalizeUnit(item.response_unit) === normalizedUnit
+    );
+    if (!unitResponse) {
+      return false;
+    }
+    const responseStatus = normalizeStatus(unitResponse.response_status);
+    const responseIsActive = UNIT_ACTIVE_RESPONSE_STATUSES.includes(responseStatus);
+    const reportIsActive = ACTIVE_STATUSES.includes(report.status);
+    return responseIsActive && reportIsActive;
+  });
+}
+
+export function getUnitHandlingStatus(report, responses, unit) {
+  const unitResponse = getUnitResponse(responses, unit);
+  if (!unitResponse) {
+    return "Not yet responded";
+  }
+  if (ACTIVE_STATUSES.includes(report.status)) {
+    return formatResponseStatus(report.status);
+  }
+  return formatResponseStatus(unitResponse.response_status);
 }
 
 export function filterHistoryReports(reports) {

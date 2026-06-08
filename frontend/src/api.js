@@ -237,4 +237,38 @@ export async function fetchStatusHistory(accessToken) {
   return unwrapList(data);
 }
 
+export async function fetchFlaggedCitizens(accessToken, params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const url = `${API_BASE_URL}/admin/citizens/${query ? `?${query}` : ""}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    await parseErrorResponse(res, "Failed to load citizen accounts.");
+  }
+  return unwrapList(await res.json());
+}
+
+export async function unsuspendCitizen(accessToken, profileId) {
+  const res = await fetch(`${API_BASE_URL}/admin/citizens/${profileId}/unsuspend/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    await parseErrorResponse(res, "Failed to unsuspend account.");
+  }
+  return res.json();
+}
+
+export async function markReportReviewed(accessToken, reportId) {
+  const res = await fetch(`${API_BASE_URL}/admin/flagged-reports/${reportId}/mark-reviewed/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    await parseErrorResponse(res, "Failed to mark report reviewed.");
+  }
+  return res.json();
+}
+
 export { API_BASE_URL };

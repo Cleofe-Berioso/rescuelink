@@ -55,6 +55,21 @@ class RescueLinkTokenObtainPairSerializer(TokenObtainPairSerializer):
                 code="authorization",
             ) from None
         user = self.user
+        account_notice = ""
+        is_suspended = False
+        try:
+            profile = user.citizen_profile
+            from .services.abuse_detection import is_profile_suspended
+
+            is_suspended = is_profile_suspended(profile)
+            if is_suspended:
+                account_notice = (
+                    "Your account is temporarily restricted due to suspicious activity. "
+                    "Please contact support or wait for admin review."
+                )
+        except CitizenProfile.DoesNotExist:
+            pass
+
         data["user"] = {
             "id": user.id,
             "username": user.username,
@@ -62,6 +77,8 @@ class RescueLinkTokenObtainPairSerializer(TokenObtainPairSerializer):
             "role": get_user_role(user),
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
+            "is_suspended": is_suspended,
+            "account_notice": account_notice,
         }
         return data
 
@@ -84,6 +101,25 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     image = serializers.ImageField(write_only=True, required=False, allow_null=True)
     responses = CitizenIncidentResponseSerializer(many=True, read_only=True)
+    citizen_notice = serializers.SerializerMethodField()
+
+    STAFF_ONLY_FIELDS = (
+        "priority_score",
+        "risk_score",
+        "risk_level",
+        "is_flagged",
+        "flag_reason",
+        "flag_type",
+        "needs_verification",
+        "ai_review_result",
+        "reviewed_at",
+        "ai_priority_reason",
+        "detected_incident_type",
+        "suggested_units",
+        "ai_confidence",
+        "ai_analyzed_at",
+        "ai_analysis_status",
+    )
 
     class Meta:
         model = EmergencyReport
@@ -98,11 +134,83 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "contact_number",
             "address_text",
             "status",
+            "is_priority",
+            "priority_level",
+            "critical_level",
+            "priority_score",
+            "ai_priority_reason",
+            "detected_incident_type",
+            "suggested_units",
+            "ai_confidence",
+            "ai_analyzed_at",
+            "ai_analysis_status",
+            "risk_score",
+            "risk_level",
+            "is_flagged",
+            "flag_reason",
+            "flag_type",
+            "needs_verification",
+            "ai_review_result",
+            "reviewed_at",
+            "citizen_notice",
             "created_at",
             "updated_at",
             "responses",
         ]
-        read_only_fields = ["status", "created_at", "updated_at", "reporter"]
+        read_only_fields = [
+            "status",
+            "created_at",
+            "updated_at",
+            "reporter",
+            "is_priority",
+            "priority_level",
+            "critical_level",
+            "priority_score",
+            "ai_priority_reason",
+            "detected_incident_type",
+            "suggested_units",
+            "ai_confidence",
+            "ai_analyzed_at",
+            "ai_analysis_status",
+            "risk_score",
+            "risk_level",
+            "is_flagged",
+            "flag_reason",
+            "flag_type",
+            "needs_verification",
+            "ai_review_result",
+            "reviewed_at",
+            "citizen_notice",
+        ]
+
+    def _request_user_is_staff(self):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return request.user.is_staff
+
+    def get_citizen_notice(self, obj):
+        if self._request_user_is_staff():
+            return ""
+        if obj.needs_verification or obj.is_flagged:
+            return (
+                "Your report was received but may require verification due to "
+                "repeated or suspicious submissions."
+            )
+        return ""
+
+    CITIZEN_HIDDEN_FIELDS = STAFF_ONLY_FIELDS + (
+        "is_priority",
+        "priority_level",
+        "critical_level",
+    )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self._request_user_is_staff():
+            for field in self.CITIZEN_HIDDEN_FIELDS:
+                data.pop(field, None)
+        return data
 
     def validate_emergency_description(self, value):
         text = (value or "").strip()
@@ -189,6 +297,7 @@ class IncidentResponseSerializer(serializers.ModelSerializer):
 class CitizenProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
+    account_notice = serializers.SerializerMethodField()
 
     class Meta:
         model = CitizenProfile
@@ -202,10 +311,32 @@ class CitizenProfileSerializer(serializers.ModelSerializer):
             "emergency_contact_name",
             "emergency_contact_number",
             "emergency_contact_relationship",
+            "is_verified",
+            "is_suspended",
+            "account_notice",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "username", "email", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "username",
+            "email",
+            "is_verified",
+            "is_suspended",
+            "account_notice",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_account_notice(self, obj):
+        from .services.abuse_detection import is_profile_suspended
+
+        if is_profile_suspended(obj):
+            return (
+                "Your account is temporarily restricted due to suspicious activity. "
+                "Please contact support or wait for admin review."
+            )
+        return ""
 
     def update(self, instance, validated_data):
         profile = super().update(instance, validated_data)
@@ -443,3 +574,34 @@ class EmergencyCategorySerializer(serializers.ModelSerializer):
         if not name:
             raise serializers.ValidationError("Name is required.")
         return name
+
+
+class CitizenAdminSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+
+    class Meta:
+        model = CitizenProfile
+        fields = [
+            "id",
+            "user_id",
+            "username",
+            "email",
+            "full_name",
+            "contact_number",
+            "home_address",
+            "is_verified",
+            "is_suspended",
+            "is_flagged",
+            "suspension_reason",
+            "suspension_until",
+            "risk_score",
+            "risk_level",
+            "last_risk_review_at",
+            "registration_ip",
+            "last_activity_ip",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields

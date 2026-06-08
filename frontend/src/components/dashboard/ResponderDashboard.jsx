@@ -1,24 +1,44 @@
 import { useMemo, useState } from "react";
 import DashboardLayout from "./DashboardLayout";
+import CommandCenter from "./CommandCenter";
 import ReportsListSection from "./ReportsListSection";
 import IncidentMapPanel from "./IncidentMapPanel";
 import ActivityLogSection from "./AdminPanels";
-import SummaryCards from "../SummaryCards";
 import ManualIncidentForm from "./ManualIncidentForm";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import {
-  filterActiveReports,
   filterHistoryReports,
   filterPriorityReports,
+  filterUnitActiveReports,
   sortReportsWithPriority,
+  displayUnitName,
 } from "../../utils/reportPriority";
+
+const LEGACY_HOME_VIEWS = ["fire-response", "police-response"];
+
+function resolveStaffView(viewId, setReportFilter) {
+  if (LEGACY_HOME_VIEWS.includes(viewId)) {
+    return "command-center";
+  }
+  if (viewId === "priority") {
+    setReportFilter("PRIORITY");
+    return "reports";
+  }
+  if (viewId === "incoming") {
+    setReportFilter("ALL");
+    return "reports";
+  }
+  return viewId;
+}
 
 export default function ResponderDashboard({ auth, onSignOut }) {
   const config = auth.config;
-  const [activeView, setActiveView] = useState(config.homeView);
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [activeView, setActiveView] = useState(() =>
+    resolveStaffView(config.homeView, () => {})
+  );
+  const [reportFilter, setReportFilter] = useState("ALL");
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
 
   const { reports, statusHistory, responsesByReport, busy, error, reload } = useDashboardData(
     auth.access,
@@ -33,139 +53,73 @@ export default function ResponderDashboard({ auth, onSignOut }) {
     () => filterPriorityReports(reports, config.role),
     [reports, config.role]
   );
-  const activeReports = useMemo(() => filterActiveReports(reports), [reports]);
+  const unitActiveReports = useMemo(
+    () => filterUnitActiveReports(reports, responsesByReport, config.defaultUnit),
+    [reports, responsesByReport, config.defaultUnit]
+  );
   const historyReports = useMemo(() => filterHistoryReports(reports), [reports]);
-
-  const unitResponses = useMemo(() => {
-    return reports.filter((report) =>
-      (responsesByReport[report.id] || []).some((r) => r.response_unit === config.defaultUnit)
-    );
-  }, [reports, responsesByReport, config.defaultUnit]);
 
   function handleReload() {
     setRefreshNonce((n) => n + 1);
     return reload();
   }
 
-  const homeViews = ["command-center", "fire-response", "police-response"];
-  const isHome = homeViews.includes(activeView);
+  function handleViewChange(viewId) {
+    setActiveView(resolveStaffView(viewId, setReportFilter));
+  }
+
+  function openReports(filter = "ALL") {
+    setReportFilter(filter);
+    setActiveView("reports");
+  }
+
+  const isHome = activeView === "command-center";
 
   let content = null;
 
   if (isHome) {
     content = (
-      <>
-        <div className="dash-notice">
-          All incoming reports are visible to DRRM, BFP, and Police. Review details and manually select the
-          correct responding unit. No automatic dispatch.
-        </div>
-        <SummaryCards reports={reports} />
-        <div className="dashboard-grid">
-          <ReportsListSection
-            title={config.incomingTitle}
-            subtitle={`${reports.length} total · ${priorityReports.length} suggested ${config.role} priority`}
-            reports={sortedReports.slice(0, 6)}
-            allReports={reports}
-            token={auth.access}
-            busy={busy}
-            error={error}
-            onReload={handleReload}
-            statusFilter="PENDING"
-            onFilterChange={() => {}}
-            config={config}
-            responsesByReport={responsesByReport}
-            showFilters={false}
-            showPriorityBadge
-            role={config.role}
-          />
-          <IncidentMapPanel reports={reports} />
-        </div>
-        {config.priorityTitle ? (
-          <ReportsListSection
-            title={config.priorityTitle}
-            subtitle="Suggested priority based on description keywords — all reports remain visible in Incoming Reports"
-            reports={priorityReports}
-            token={auth.access}
-            busy={busy}
-            error=""
-            onReload={handleReload}
-            statusFilter="ALL"
-            onFilterChange={() => {}}
-            config={config}
-            responsesByReport={responsesByReport}
-            showFilters={false}
-            showPriorityBadge
-            role={config.role}
-            emptyTitle="No suggested priority incidents"
-            emptyMessage="All incidents are still listed under Incoming Reports for manual review."
-          />
-        ) : null}
-        <ActivityLogSection statusHistory={statusHistory} limit={8} title="Recent Activity" />
-        {config.showManualEntry ? (
-          <section className="manual-entry-section">
-            {!showManualEntry ? (
-              <button type="button" className="btn btn--outline" onClick={() => setShowManualEntry(true)}>
-                + Add Manual Incident
-              </button>
-            ) : (
-              <ManualIncidentForm
-                token={auth.access}
-                onCreated={handleReload}
-                onClose={() => setShowManualEntry(false)}
-              />
-            )}
-          </section>
-        ) : null}
-      </>
+      <CommandCenter
+        config={config}
+        reports={reports}
+        statusHistory={statusHistory}
+        priorityCount={priorityReports.length}
+        unitActiveCount={unitActiveReports.length}
+        historyCount={historyReports.length}
+        onOpenReports={openReports}
+        onOpenMap={() => handleViewChange("map")}
+        onOpenActive={() => handleViewChange("active")}
+        onOpenHistory={() => handleViewChange("history")}
+      />
     );
-  } else if (activeView === "incoming") {
+  } else if (activeView === "reports") {
     content = (
       <ReportsListSection
-        title={config.incomingTitle}
-        subtitle="All emergency reports · every response unit can view and manually respond"
+        title={config.reportsTitle || "Emergency Reports"}
+        subtitle="Monitor and respond to incoming emergency incidents"
         reports={sortedReports}
         allReports={reports}
         token={auth.access}
         busy={busy}
         error={error}
         onReload={handleReload}
-        statusFilter={statusFilter}
-        onFilterChange={setStatusFilter}
+        statusFilter={reportFilter}
+        onFilterChange={setReportFilter}
         config={config}
         responsesByReport={responsesByReport}
-        showPriorityBadge
+        statusHistory={statusHistory}
         role={config.role}
-      />
-    );
-  } else if (activeView === "priority") {
-    content = (
-      <ReportsListSection
-        title={config.priorityTitle}
-        subtitle={`${priorityReports.length} suggested matches · does not hide other reports`}
-        reports={priorityReports.length ? priorityReports : sortedReports}
-        allReports={reports}
-        token={auth.access}
-        busy={busy}
-        error={error}
-        onReload={handleReload}
-        statusFilter={statusFilter}
-        onFilterChange={setStatusFilter}
-        config={config}
-        responsesByReport={responsesByReport}
-        showPriorityBadge
-        role={config.role}
-        emptyTitle="No keyword matches yet"
-        emptyMessage="All incidents remain available under Incoming Reports."
+        queueLayout
       />
     );
   } else if (activeView === "map") {
-    content = <IncidentMapPanel reports={reports} />;
+    content = <IncidentMapPanel reports={reports} title="Incident Map" />;
   } else if (activeView === "active") {
     content = (
       <ReportsListSection
         title={config.activeTitle}
-        subtitle={`${activeReports.length} active · ${unitResponses.length} with ${config.defaultUnit} response logged`}
-        reports={activeReports}
+        subtitle={`${unitActiveReports.length} incident${unitActiveReports.length === 1 ? "" : "s"} currently handled by ${displayUnitName(config.defaultUnit)}`}
+        reports={unitActiveReports}
         token={auth.access}
         busy={busy}
         error={error}
@@ -175,10 +129,13 @@ export default function ResponderDashboard({ auth, onSignOut }) {
         config={config}
         responsesByReport={responsesByReport}
         showFilters={false}
-        showPriorityBadge
+        showPriorityBadge={false}
         role={config.role}
-        emptyTitle="No active responses"
-        emptyMessage="Accepted, dispatched, and in-progress incidents appear here."
+        actionsMode="monitor"
+        emptyTitle="No active responses for your unit yet."
+        emptyMessage="Reports accepted or handled by your unit will appear here."
+        emptyActionLabel="Go to Emergency Reports"
+        onEmptyAction={() => openReports("ALL")}
       />
     );
   } else if (activeView === "history") {
@@ -204,16 +161,36 @@ export default function ResponderDashboard({ auth, onSignOut }) {
     );
   }
 
+  const headerActions =
+    isHome && config.showManualEntry ? (
+      <button type="button" className="btn btn--primary btn--sm" onClick={() => setShowManualForm(true)}>
+        + Add Manual Incident
+      </button>
+    ) : null;
+
   return (
     <DashboardLayout
       config={config}
       username={auth.username}
       role={auth.role}
       activeView={activeView}
-      onViewChange={setActiveView}
+      onViewChange={handleViewChange}
       onSignOut={onSignOut}
+      pageTitle={isHome ? config.commandCenterTitle : undefined}
+      pageTagline={isHome ? config.commandCenterTagline : undefined}
+      headerActions={headerActions}
     >
       {content}
+      {isHome && config.showManualEntry && showManualForm ? (
+        <ManualIncidentForm
+          token={auth.access}
+          onCreated={() => {
+            handleReload();
+            setShowManualForm(false);
+          }}
+          onClose={() => setShowManualForm(false)}
+        />
+      ) : null}
     </DashboardLayout>
   );
 }

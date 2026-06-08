@@ -13,6 +13,7 @@ from .views import (
 	health,
 )
 from .admin_views import EmergencyCategoryViewSet, StaffUserViewSet
+from .admin_abuse_views import CitizenAdminViewSet, FlaggedReportAdminViewSet
 
 router = DefaultRouter()
 router.register("reports", EmergencyReportViewSet, basename="reports")
@@ -20,6 +21,8 @@ router.register("responses", IncidentResponseViewSet, basename="responses")
 router.register("status-history", IncidentStatusHistoryViewSet, basename="status-history")
 router.register("admin/users", StaffUserViewSet, basename="admin-users")
 router.register("admin/categories", EmergencyCategoryViewSet, basename="admin-categories")
+router.register("admin/citizens", CitizenAdminViewSet, basename="admin-citizens")
+router.register("admin/flagged-reports", FlaggedReportAdminViewSet, basename="admin-flagged-reports")
 
 urlpatterns = [
     path("health/", health, name="health"),

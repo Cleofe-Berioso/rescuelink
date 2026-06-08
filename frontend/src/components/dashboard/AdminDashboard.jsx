@@ -2,11 +2,17 @@ import { useState } from "react";
 import DashboardLayout from "./DashboardLayout";
 import ReportsListSection from "./ReportsListSection";
 import IncidentMapPanel from "./IncidentMapPanel";
-import ActivityLogSection, { AdminStatsGrid, PlaceholderPanel } from "./AdminPanels";
+import ActivityLogSection, { AdminStatsGrid } from "./AdminPanels";
 import AdminUsersPanel from "./AdminUsersPanel";
 import AdminSettingsPanel from "./AdminSettingsPanel";
 import { useDashboardData } from "../../hooks/useDashboardData";
-import { filterActiveReports } from "../../utils/reportPriority";
+
+function resolveAdminView(viewId) {
+  if (viewId === "reports") {
+    return "dashboard";
+  }
+  return viewId;
+}
 
 export default function AdminDashboard({ auth, onSignOut }) {
   const config = auth.config;
@@ -23,31 +29,39 @@ export default function AdminDashboard({ auth, onSignOut }) {
     return reload();
   }
 
+  function handleViewChange(viewId) {
+    setActiveView(resolveAdminView(viewId));
+  }
+
   let content = null;
 
   if (activeView === "dashboard") {
     content = (
       <>
         <AdminStatsGrid reports={reports} />
-        <div className="dashboard-grid">
-          <ReportsListSection
-            title="Recent Incident Records"
-            subtitle={`Monitoring ${reports.length} total records · read-only`}
-            reports={reports.slice(0, 8)}
-            allReports={reports}
-            token={auth.access}
-            busy={busy}
-            error={error}
-            onReload={handleReload}
-            statusFilter="ALL"
-            onFilterChange={() => {}}
-            config={config}
-            responsesByReport={responsesByReport}
-            showFilters={false}
-          />
-          <IncidentMapPanel reports={reports} title="System Incident Map" />
-        </div>
-        <ActivityLogSection statusHistory={statusHistory} limit={12} />
+        <section className="card home-quick-links">
+          <span className="card__eyebrow">Quick navigation</span>
+          <h2>Administration</h2>
+          <p className="card__desc">
+            Monitor system-wide incidents, manage staff accounts, and review audit activity.
+          </p>
+          <div className="home-quick-links__grid">
+            <button type="button" className="btn btn--primary" onClick={() => handleViewChange("incidents")}>
+              Emergency Reports ({reports.length})
+            </button>
+            <button type="button" className="btn btn--outline" onClick={() => handleViewChange("users")}>
+              Users
+            </button>
+            <button type="button" className="btn btn--outline" onClick={() => handleViewChange("map")}>
+              Map
+            </button>
+            <button type="button" className="btn btn--outline" onClick={() => handleViewChange("activity")}>
+              Activity Log
+            </button>
+          </div>
+        </section>
+        <IncidentMapPanel reports={reports} title="System incident map preview" compact />
+        <ActivityLogSection statusHistory={statusHistory} limit={12} title="Recent Activity" />
       </>
     );
   } else if (activeView === "users") {
@@ -55,7 +69,8 @@ export default function AdminDashboard({ auth, onSignOut }) {
   } else if (activeView === "incidents") {
     content = (
       <ReportsListSection
-        title="All Incident Records"
+        title={config.reportsTitle || "Emergency Reports"}
+        subtitle="Monitor and respond to incoming emergency incidents"
         reports={reports}
         token={auth.access}
         busy={busy}
@@ -65,34 +80,15 @@ export default function AdminDashboard({ auth, onSignOut }) {
         onFilterChange={setStatusFilter}
         config={config}
         responsesByReport={responsesByReport}
+        statusHistory={statusHistory}
+        role="ADMIN"
+        queueLayout
       />
     );
-  } else if (activeView === "reports") {
-    content = (
-      <>
-        <AdminStatsGrid reports={reports} />
-        <PlaceholderPanel
-          title="Reports & Analytics"
-          message="Summary statistics are generated from live incident records. Export and advanced analytics can be added when reporting endpoints are available."
-        />
-        <div className="analytics-grid">
-          <article className="card">
-            <h3>Response Units Active</h3>
-            <p className="card__desc">
-              {Object.keys(responsesByReport).length} incident(s) have at least one unit response logged.
-            </p>
-          </article>
-          <article className="card">
-            <h3>Open Incidents</h3>
-            <p className="card__desc">
-              {filterActiveReports(reports).length} incident(s) currently accepted, dispatched, or in progress.
-            </p>
-          </article>
-        </div>
-      </>
-    );
+  } else if (activeView === "map") {
+    content = <IncidentMapPanel reports={reports} title="System Incident Map" />;
   } else if (activeView === "activity") {
-    content = <ActivityLogSection statusHistory={statusHistory} />;
+    content = <ActivityLogSection statusHistory={statusHistory} title="Activity Log" />;
   } else if (activeView === "settings") {
     content = <AdminSettingsPanel token={auth.access} />;
   }
@@ -103,7 +99,7 @@ export default function AdminDashboard({ auth, onSignOut }) {
       username={auth.username}
       role={auth.role}
       activeView={activeView}
-      onViewChange={setActiveView}
+      onViewChange={handleViewChange}
       onSignOut={onSignOut}
     >
       {content}

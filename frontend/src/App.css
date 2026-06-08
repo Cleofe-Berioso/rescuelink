@@ -421,6 +421,11 @@
   background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
 }
 
+.summary-card--purple {
+  border-color: rgba(124, 58, 237, 0.25);
+  background: linear-gradient(180deg, #f5f3ff 0%, #ffffff 100%);
+}
+
 .summary-card__label {
   margin: 0;
   font-size: 0.78rem;
@@ -785,24 +790,61 @@ textarea {
 /* Dashboard grid */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1.15fr 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
   align-items: start;
 }
 
-.reports-panel {
-  margin-bottom: 0;
+.dashboard-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-@media (max-width: 960px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
+.priority-summary__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.home-quick-links h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.home-quick-links__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.map-card--compact .incident-map {
+  height: min(360px, 45vh);
+  min-height: 280px;
+}
+
+.reports-panel__priority-note {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .report-list {
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (min-width: 1100px) {
+  .report-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Report card */
@@ -899,6 +941,244 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
+}
+
+.incident-photo {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.incident-photo__link {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-action);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.incident-photo__link:hover .incident-photo__caption {
+  text-decoration: underline;
+}
+
+.incident-photo__img {
+  width: 100%;
+  max-width: min(480px, 100%);
+  height: auto;
+  min-height: 160px;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.incident-photo--thumb .incident-photo__link {
+  width: 100%;
+  height: 100%;
+}
+
+.incident-photo--thumb .incident-photo__img {
+  width: 100%;
+  height: 100%;
+  min-height: 88px;
+  max-height: 120px;
+  max-width: none;
+  object-fit: cover;
+}
+.incident-photo--thumb.incident-photo--empty,
+.incident-photo--thumb.incident-photo--loading,
+.incident-photo--thumb.incident-photo--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  padding: 8px;
+  text-align: center;
+  font-size: 0.72rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border);
+  background: var(--color-border-soft);
+}
+
+.incident-photo--drawer .incident-photo__img {
+  max-width: 100%;
+  width: 100%;
+  min-height: 160px;
+  max-height: 300px;
+  object-fit: cover;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.reports-panel--queue {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reports-panel--queue .reports-panel__header {
+  padding: 20px 22px;
+  margin-bottom: 0;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.reports-panel--queue .report-filters,
+.reports-panel--queue .report-search-sort,
+.reports-panel--queue .reports-panel__priority-note {
+  margin-top: 14px;
+}
+
+.reports-panel--queue .report-filters {
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-search-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-search-sort__search {
+  flex: 1 1 220px;
+}
+
+.report-search-sort__input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.report-search-sort__sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-search-sort__sort-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.report-search-sort__select {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.report-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.report-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-pagination__summary {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.report-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.report-pagination__page {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.incident-photo--error {
+  color: var(--color-critical);
+}
+
+.your-unit-status {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-border-soft);
+  border: 1px solid var(--color-border);
+}
+
+.your-unit-status__line {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.your-unit-status__line + .your-unit-status__line {
+  margin-top: 4px;
+}
+
+.your-unit-status__responded {
+  color: var(--color-success);
+}
+
+.your-unit-status__pending {
+  color: var(--color-warning);
+}
+
+.unit-response-card__account {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.report-filters {
+  flex-wrap: wrap;
+}
+
+.reports-panel {
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .report-card__actions {
@@ -1051,6 +1331,10 @@ textarea {
   margin: 8px 0 0;
   font-size: 0.88rem;
   color: var(--color-text-muted);
+}
+
+.empty-state__action {
+  margin-top: 16px;
 }
 
 .loading-state {

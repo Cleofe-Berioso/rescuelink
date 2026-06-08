@@ -5,7 +5,7 @@ module.exports = {
     ...appJson.expo,
     extra: {
       ...appJson.expo.extra,
-      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api",
+      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "https://supereffectively-mycostatic-lilla.ngrok-free.dev",
     },
     ios: {
       ...appJson.expo.ios,

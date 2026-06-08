@@ -27,7 +27,7 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-
 
 // Django API base URL — set EXPO_PUBLIC_API_BASE_URL in .env or app.config.js extra.apiBaseUrl.
 // For Expo Go on a physical device, use an HTTPS tunnel to Django (port 8000), not the Metro tunnel.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "https://supereffectively-mycostatic-lilla.ngrok-free.dev";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 const RATE_LIMIT_MESSAGE = "Too many requests. Please wait and try again.";
@@ -2199,6 +2199,7 @@ function ReportScreen({
   onLogout,
   submitBusy,
   locBusy,
+  accountNotice = "",
 }) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("report");
@@ -2225,6 +2226,12 @@ function ReportScreen({
           submitBusy={submitBusy}
           paddingTop={headerPaddingTop}
         />
+
+        {accountNotice ? (
+          <View style={reportStyles.accountNoticeBanner}>
+            <Text style={reportStyles.accountNoticeText}>{accountNotice}</Text>
+          </View>
+        ) : null}
 
         {activeTab === "report" ? (
           <ScrollView
@@ -2462,6 +2469,7 @@ export default function App() {
   const [emergencyContactRelationship, setEmergencyContactRelationship] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [accountNotice, setAccountNotice] = useState("");
 
   function applyProfileData(profile) {
     if (!profile) return;
@@ -2472,6 +2480,7 @@ export default function App() {
     setEmergencyContactName(profile.emergency_contact_name || "");
     setEmergencyContactNumber(profile.emergency_contact_number || "");
     setEmergencyContactRelationship(profile.emergency_contact_relationship || "");
+    setAccountNotice(profile.account_notice || "");
   }
 
   function syncReportFieldsFromProfile(profile) {
@@ -2492,6 +2501,7 @@ export default function App() {
     setEmergencyContactName("");
     setEmergencyContactNumber("");
     setEmergencyContactRelationship("");
+    setAccountNotice("");
   }
 
   async function loadProfile(accessToken) {
@@ -2612,6 +2622,12 @@ export default function App() {
         await saveSession(data.access, data.refresh || "", username.trim());
       } else {
         await clearSavedSession();
+      }
+
+      const notice = data.user?.account_notice || "";
+      setAccountNotice(notice);
+      if (notice) {
+        Alert.alert("Account restricted", notice);
       }
 
       await loadProfile(data.access);
@@ -2779,7 +2795,10 @@ export default function App() {
 
       clearReportForm();
       setReportRefreshKey((key) => key + 1);
-      Alert.alert("Submitted", `Emergency report #${data.id} submitted.`);
+      const successMessage = data.citizen_notice
+        ? data.citizen_notice
+        : `Emergency report #${data.id} submitted.`;
+      Alert.alert("Submitted", successMessage);
     } catch (error) {
       Alert.alert("Submit error", error.message);
     } finally {
@@ -2858,6 +2877,7 @@ export default function App() {
             onLogout={handleLogout}
             submitBusy={submitBusy}
             locBusy={locBusy}
+            accountNotice={accountNotice}
           />
         </View>
       )}
@@ -3432,6 +3452,21 @@ const loginStyles = StyleSheet.create({
 const reportStyles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  accountNoticeBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+  },
+  accountNoticeText: {
+    color: "#92400e",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
   },
   safe: {
     flex: 1,
