@@ -1,34 +1,25 @@
 {
-    "cli": {
-      "version": ">= 13.0.0"
+  "cli": {
+    "version": ">= 13.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
     },
-    "build": {
-      "development": {
-        "developmentClient": true,
-        "distribution": "internal",
-        "env": {
-          "EXPO_PUBLIC_API_BASE_URL": "https://your-rescuelink-backend.onrender.com/api"
-        }
-      },
-      "preview": {
-        "distribution": "internal",
-        "android": {
-          "buildType": "apk"
-        },
-        "env": {
-          "EXPO_PUBLIC_API_BASE_URL": "https://your-rescuelink-backend.onrender.com/api"
-        }
-      },
-      "production": {
-        "android": {
-          "buildType": "app-bundle"
-        },
-        "env": {
-          "EXPO_PUBLIC_API_BASE_URL": "https://your-rescuelink-backend.onrender.com/api"
-        }
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     },
-    "submit": {
-      "production": {}
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
+  },
+  "submit": {
+    "production": {}
   }
+}
