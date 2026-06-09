@@ -4,8 +4,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
-import { useEffect, useRef, useState } from "react";
-import MapView, { Circle, Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { useEffect, useState } from "react";
+import { WebView } from "react-native-webview";
 import {
   ActivityIndicator,
   Alert,
@@ -482,8 +482,6 @@ const REPORT_FILTER_OPTIONS = [
   { key: "responding", label: "Responding", icon: "flash-outline" },
   { key: "resolved", label: "Resolved", icon: "checkmark-circle-outline" },
 ];
-
-const REPORT_CARD_MAP_DELTA = 0.015;
 
 const PENDING_STATUSES = new Set(["PENDING", "VIEWED"]);
 const RESPONDING_STATUSES = new Set(["ACCEPTED", "DISPATCHED", "IN_PROGRESS"]);
@@ -992,6 +990,197 @@ function buildMapRegion(latitude, longitude) {
   };
 }
 
+
+
+function buildLeafletMapHtml({
+  latitude,
+  longitude,
+  selectable = false,
+  zoom = 15,
+}) {
+  const lat = parseCoordinate(latitude);
+  const lng = parseCoordinate(longitude);
+  const centerLat = lat ?? SILAY_CITY_LAT;
+  const centerLng = lng ?? SILAY_CITY_LNG;
+  const hasMarker = lat != null && lng != null;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          html, body, #map {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background: #e2e8f0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          }
+
+          .marker-pin {
+            width: 24px;
+            height: 24px;
+            border-radius: 50% 50% 50% 0;
+            background: #ef4444;
+            transform: rotate(-45deg);
+            border: 3px solid #ffffff;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.28);
+          }
+
+          .marker-pin::after {
+            content: "";
+            width: 8px;
+            height: 8px;
+            margin: 5px 0 0 5px;
+            background: #ffffff;
+            position: absolute;
+            border-radius: 50%;
+          }
+
+          .leaflet-control-attribution {
+            font-size: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          var center = [${centerLat}, ${centerLng}];
+          var selectable = ${selectable ? "true" : "false"};
+          var marker = null;
+          var accuracyCircle = null;
+
+          var map = L.map("map", {
+            zoomControl: false,
+            attributionControl: true,
+          }).setView(center, ${zoom});
+
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors",
+          }).addTo(map);
+
+          var pinIcon = L.divIcon({
+            className: "",
+            html: '<div class="marker-pin"></div>',
+            iconSize: [30, 42],
+            iconAnchor: [15, 36],
+          });
+
+          function setMarker(lat, lng, shouldNotify) {
+            var position = [lat, lng];
+
+            if (marker) {
+              marker.setLatLng(position);
+            } else {
+              marker = L.marker(position, { icon: pinIcon }).addTo(map);
+            }
+
+            if (accuracyCircle) {
+              accuracyCircle.setLatLng(position);
+            } else {
+              accuracyCircle = L.circle(position, {
+                radius: 100,
+                color: "rgba(37, 99, 235, 0.45)",
+                fillColor: "rgba(37, 99, 235, 0.12)",
+                fillOpacity: 1,
+                weight: 2,
+              }).addTo(map);
+            }
+
+            map.setView(position, ${zoom});
+
+            if (shouldNotify && window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: "map_press",
+                latitude: lat,
+                longitude: lng
+              }));
+            }
+          }
+
+          ${hasMarker ? `setMarker(${lat}, ${lng}, false);` : ""}
+
+          if (selectable) {
+            map.on("click", function (event) {
+              setMarker(event.latlng.lat, event.latlng.lng, true);
+            });
+          }
+        </script>
+      </body>
+    </html>
+  `;
+}
+
+function LeafletMapView({
+  latitude,
+  longitude,
+  selectable = false,
+  interactive = true,
+  zoom = 15,
+  onLocationPicked,
+  style,
+}) {
+  const html = buildLeafletMapHtml({
+    latitude,
+    longitude,
+    selectable,
+    zoom,
+  });
+
+  function handleMessage(event) {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data?.type !== "map_press") {
+        return;
+      }
+
+      const pickedLat = parseCoordinate(data.latitude);
+      const pickedLng = parseCoordinate(data.longitude);
+
+      if (pickedLat == null || pickedLng == null) {
+        return;
+      }
+
+      onLocationPicked?.({
+        latitude: pickedLat,
+        longitude: pickedLng,
+      });
+    } catch {
+      // Ignore invalid WebView messages.
+    }
+  }
+
+  return (
+    <WebView
+      originWhitelist={["*"]}
+      source={{ html }}
+      style={style}
+      javaScriptEnabled
+      domStorageEnabled
+      scrollEnabled={interactive}
+      nestedScrollEnabled={interactive}
+      setSupportMultipleWindows={false}
+      androidLayerType="hardware"
+      onMessage={handleMessage}
+      pointerEvents={interactive ? "auto" : "none"}
+    />
+  );
+}
+
+
 function ReportHeaderPattern() {
   const dots = [];
   for (let i = 0; i < 24; i += 1) {
@@ -1038,71 +1227,26 @@ function ReportHeader({ username, onLogout, submitBusy, paddingTop }) {
   );
 }
 
-function MapPreview({ latitude, longitude, onRecenter, locBusy }) {
-  const mapRef = useRef(null);
-  const { latitude: regionLat, longitude: regionLng, latitudeDelta, longitudeDelta, hasValidCoords, lat, lng } =
-    buildMapRegion(latitude, longitude);
-
-  const region = {
-    latitude: regionLat,
-    longitude: regionLng,
-    latitudeDelta,
-    longitudeDelta,
-  };
-
-  useEffect(() => {
-    if (!hasValidCoords || !mapRef.current) {
-      return;
-    }
-
-    mapRef.current.animateToRegion(
-      {
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: MAP_REGION_DELTA,
-        longitudeDelta: MAP_REGION_DELTA,
-      },
-      700
-    );
-  }, [lat, lng, hasValidCoords]);
+function MapPreview({ latitude, longitude, onRecenter, locBusy, onLocationPicked }) {
+  const { hasValidCoords } = buildMapRegion(latitude, longitude);
 
   return (
     <View style={reportStyles.mapPreview}>
-      <MapView
-        ref={mapRef}
+      <LeafletMapView
+        latitude={latitude}
+        longitude={longitude}
+        selectable
+        interactive
+        zoom={15}
+        onLocationPicked={onLocationPicked}
         style={StyleSheet.absoluteFill}
-        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-        initialRegion={region}
-        mapType="standard"
-        loadingEnabled
-        showsUserLocation={hasValidCoords}
-        showsMyLocationButton={false}
-        rotateEnabled={false}
-        pitchEnabled={false}
-      >
-        {hasValidCoords ? (
-          <>
-            <Marker
-              coordinate={{ latitude: lat, longitude: lng }}
-              title="Emergency Location"
-              description="Selected emergency report location"
-            />
-            <Circle
-              center={{ latitude: lat, longitude: lng }}
-              radius={100}
-              strokeColor="rgba(37, 99, 235, 0.45)"
-              fillColor="rgba(37, 99, 235, 0.12)"
-              strokeWidth={2}
-            />
-          </>
-        ) : null}
-      </MapView>
+      />
 
       {!hasValidCoords ? (
         <View style={reportStyles.mapPlaceholderOverlay} pointerEvents="none">
           <Ionicons name="map-outline" size={28} color="#64748b" style={reportStyles.mapPlaceholderIcon} />
           <Text style={reportStyles.mapPlaceholderText}>
-            Tap Pick on Map or Tap to re-center to get your GPS location.
+            Tap the map to pin the emergency location, or tap locate to use your GPS.
           </Text>
         </View>
       ) : null}
@@ -1120,8 +1264,8 @@ function MapPreview({ latitude, longitude, onRecenter, locBusy }) {
           {locBusy
             ? "Locating…"
             : hasValidCoords
-              ? "Tap to re-center"
-              : "Tap to get GPS location"}
+              ? "Tap map to move pin"
+              : "Tap map or locate"}
         </Text>
       </View>
     </View>
@@ -1335,31 +1479,16 @@ function ReportCardMapPreview({ latitude, longitude, onViewDetails }) {
     );
   }
 
-  const region = {
-    latitude: lat,
-    longitude: lng,
-    latitudeDelta: REPORT_CARD_MAP_DELTA,
-    longitudeDelta: REPORT_CARD_MAP_DELTA,
-  };
-
   return (
     <View style={reportStyles.reportCardMapWrap}>
-      <MapView
+      <LeafletMapView
+        latitude={lat}
+        longitude={lng}
+        selectable={false}
+        interactive={false}
+        zoom={15}
         style={reportStyles.reportCardMap}
-        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-        initialRegion={region}
-        mapType="standard"
-        loadingEnabled
-        scrollEnabled={false}
-        zoomEnabled={false}
-        rotateEnabled={false}
-        pitchEnabled={false}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        pointerEvents="none"
-      >
-        <Marker coordinate={{ latitude: lat, longitude: lng }} pinColor="#ef4444" />
-      </MapView>
+      />
       <Pressable style={reportStyles.viewDetailsBtn} onPress={onViewDetails}>
         <Text style={reportStyles.viewDetailsBtnText}>View Details</Text>
       </Pressable>
@@ -2362,6 +2491,10 @@ function ReportScreen({
                 longitude={longitude}
                 onRecenter={onGetLocation}
                 locBusy={locBusy}
+                onLocationPicked={({ latitude: pickedLat, longitude: pickedLng }) => {
+                  onLatitudeChange(String(pickedLat));
+                  onLongitudeChange(String(pickedLng));
+                }}
               />
             </View>
 
