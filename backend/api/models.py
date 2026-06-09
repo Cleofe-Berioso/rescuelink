@@ -1,5 +1,14 @@
+import hashlib
+import logging
+import os
+import secrets
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
+
+otp_logger = logging.getLogger("rescuelink.security")
 
 
 class EmergencyReport(models.Model):
@@ -247,3 +256,66 @@ class EmergencyCategory(models.Model):
 
 	def __str__(self):
 		return self.name
+
+
+# =============================================================================
+# OTP Record
+# Stores one-time-password records for citizen registration and forgot-password
+# flows.  The raw OTP is NEVER stored — only a SHA-256 hash.
+# =============================================================================
+
+def _default_expires_at():
+	"""Returns now + OTP_EXPIRY_MINUTES (from settings, default 5)."""
+	minutes = getattr(settings, "OTP_EXPIRY_MINUTES", 5)
+	return timezone.now() + timezone.timedelta(minutes=minutes)
+
+
+def generate_otp_code():
+	"""Generate a cryptographically-secure 6-digit numeric OTP string."""
+	return "{:06d}".format(secrets.randbelow(1_000_000))
+
+
+def hash_otp(otp_code: str) -> str:
+	"""Return the SHA-256 hex-digest of the OTP code."""
+	return hashlib.sha256(otp_code.encode()).hexdigest()
+
+
+class OTPRecord(models.Model):
+	PURPOSE_REGISTER = "REGISTER"
+	PURPOSE_FORGOT = "FORGOT_PASSWORD"
+
+	PURPOSE_CHOICES = [
+		(PURPOSE_REGISTER, "Register"),
+		(PURPOSE_FORGOT, "Forgot Password"),
+	]
+
+	email = models.EmailField(max_length=254)
+	otp_hash = models.CharField(max_length=64)  # SHA-256 hex digest
+	purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES)
+	created_at = models.DateTimeField(auto_now_add=True)
+	expires_at = models.DateTimeField(default=_default_expires_at)
+	# verified_at is set by /verify-register-otp/; registration checks this
+	verified_at = models.DateTimeField(null=True, blank=True)
+	is_used = models.BooleanField(default=False)
+	attempt_count = models.PositiveSmallIntegerField(default=0)
+
+	class Meta:
+		ordering = ["-created_at"]
+		indexes = [
+			models.Index(fields=["email", "purpose"]),
+		]
+
+	def is_expired(self) -> bool:
+		return timezone.now() > self.expires_at
+
+	def is_blocked(self) -> bool:
+		"""Too many wrong attempts — this OTP is permanently invalidated."""
+		max_attempts = getattr(settings, "OTP_MAX_ATTEMPTS", 5)
+		return self.attempt_count >= max_attempts
+
+	def check_otp(self, raw_otp: str) -> bool:
+		"""Compare raw OTP against stored hash. Constant-time comparison."""
+		return secrets.compare_digest(hash_otp(raw_otp), self.otp_hash)
+
+	def __str__(self):
+		return f"OTP [{self.purpose}] for {self.email} (used={self.is_used})"

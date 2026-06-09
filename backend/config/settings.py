@@ -180,6 +180,9 @@ REST_FRAMEWORK = {
         "image_upload": os.environ.get("THROTTLE_IMAGE_UPLOAD", "20/hour"),
         "staff_action": os.environ.get("THROTTLE_STAFF_ACTION", "120/hour"),
         "admin_action": os.environ.get("THROTTLE_ADMIN_ACTION", "120/hour"),
+        # OTP endpoints — tighter limits to prevent abuse
+        "otp_request": os.environ.get("THROTTLE_OTP_REQUEST", "5/hour"),
+        "otp_verify": os.environ.get("THROTTLE_OTP_VERIFY", "10/hour"),
     },
     "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
 }
@@ -214,6 +217,26 @@ AI_REVIEW_THRESHOLD = int(os.environ.get("AI_REVIEW_THRESHOLD", "70"))
 AI_AUTO_SUSPEND_THRESHOLD = int(os.environ.get("AI_AUTO_SUSPEND_THRESHOLD", "90"))
 
 DJANGO_ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/").strip("/") + "/"
+
+# =============================================================================
+# Email — Gmail SMTP
+# IMPORTANT: Use a Gmail App Password, NOT your regular Gmail password.
+# Enable 2-Step Verification on your Google account, then generate an App
+# Password at https://myaccount.google.com/apppasswords
+# Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD in backend/.env only.
+# Never hardcode credentials here.
+# =============================================================================
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", "True")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "RescueLink <noreply@example.com>")
+
+# OTP settings
+OTP_EXPIRY_MINUTES = int(os.environ.get("OTP_EXPIRY_MINUTES", "5"))
+OTP_MAX_ATTEMPTS = int(os.environ.get("OTP_MAX_ATTEMPTS", "5"))
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

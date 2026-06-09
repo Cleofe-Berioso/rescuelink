@@ -10,7 +10,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CitizenProfile, EmergencyCategory, EmergencyReport, IncidentResponse, IncidentStatusHistory
+from .models import CitizenProfile, EmergencyCategory, EmergencyReport, IncidentResponse, IncidentStatusHistory, OTPRecord
 from .storage import ALLOWED_EMERGENCY_PHOTO_CONTENT_TYPES
 
 UserModel = get_user_model()
@@ -398,15 +398,47 @@ class CitizenRegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError("Contact number is required.")
         return value.strip()
 
+    def validate_email(self, value):
+        email = (value or "").strip().lower()
+        if not email:
+            raise serializers.ValidationError("Email is required.")
+        # Defense-in-depth: OTP request already blocks this, but validate here too
+        if UserModel.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return email
+
     def validate(self, attrs):
         if attrs["password"] != attrs["confirm_password"]:
             raise serializers.ValidationError(
                 {"confirm_password": "Password and confirmation do not match."}
             )
+
+        # OTP gate: ensure the email has been OTP-verified before registration
+        email = attrs.get("email", "").strip().lower()
+        if email:
+            otp_record = (
+                OTPRecord.objects
+                .filter(
+                    email__iexact=email,
+                    purpose=OTPRecord.PURPOSE_REGISTER,
+                    is_used=False,
+                    verified_at__isnull=False,  # must have been verified
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if otp_record is None or otp_record.is_expired():
+                raise serializers.ValidationError(
+                    {"email": "Email OTP verification required before registration. Please verify your email first."}
+                )
+            attrs["_otp_record"] = otp_record
+
         return attrs
 
     def create(self, validated_data):
+        # Pop internal tracking keys before creating the user
         validated_data.pop("confirm_password")
+        validated_data.pop("_otp_record", None)  # passed from validate(); not a model field
         full_name = validated_data.pop("full_name")
         contact_number = validated_data.pop("contact_number")
         password = validated_data.pop("password")
@@ -433,6 +465,7 @@ class CitizenRegisterSerializer(serializers.Serializer):
         )
 
         return user
+
 
 
 class IncidentStatusHistorySerializer(serializers.ModelSerializer):

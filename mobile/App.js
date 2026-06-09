@@ -328,6 +328,27 @@ async function apiRegister(payload) {
   return apiJsonRequest(null, "POST", "/auth/register/", payload);
 }
 
+// OTP API helpers — use the same apiJsonRequest / API_BASE_URL as the rest of the app
+async function apiRequestRegisterOTP(email) {
+  return apiJsonRequest(null, "POST", "/auth/request-register-otp/", { email });
+}
+
+async function apiVerifyRegisterOTP(email, otp) {
+  return apiJsonRequest(null, "POST", "/auth/verify-register-otp/", { email, otp });
+}
+
+async function apiRequestPasswordResetOTP(email) {
+  return apiJsonRequest(null, "POST", "/auth/request-password-reset-otp/", { email });
+}
+
+async function apiResetPasswordWithOTP(email, otp, newPassword) {
+  return apiJsonRequest(null, "POST", "/auth/reset-password-with-otp/", {
+    email,
+    otp,
+    new_password: newPassword,
+  });
+}
+
 function displayOrNotSet(value) {
   const trimmed = String(value || "").trim();
   return trimmed || "Not set";
@@ -693,68 +714,109 @@ function LoginInputField({
   );
 }
 
+// =============================================================================
+// RegisterModal — 3-step OTP flow
+// Step 1: Fill form details + request OTP
+// Step 2: Enter OTP to verify email
+// Step 3: Complete registration (auto-submit after OTP verified)
+// =============================================================================
 function RegisterModal({ visible, onClose, onRegistered }) {
+  // Step: "form" | "otp" | "submitting"
+  const [step, setStep] = useState("form");
+
+  // Form fields
   const [fullName, setFullName] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [email, setEmail] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // OTP step
+  const [otpCode, setOtpCode] = useState("");
+
+  // UI state
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   function resetForm() {
+    setStep("form");
     setFullName("");
     setRegUsername("");
     setEmail("");
     setContactNumber("");
     setRegPassword("");
     setConfirmPassword("");
+    setOtpCode("");
     setErrorMessage("");
+    setSuccessMessage("");
   }
 
   function handleClose() {
+    if (busy) return;
     resetForm();
     onClose();
   }
 
-  function validateForm() {
-    if (!fullName.trim()) {
-      return "Full name is required.";
-    }
-    if (!regUsername.trim()) {
-      return "Username is required.";
-    }
-    if (!email.trim()) {
-      return "Email is required.";
-    }
-    if (!email.includes("@")) {
-      return "Email must contain @.";
-    }
-    if (!contactNumber.trim()) {
-      return "Contact number is required.";
-    }
-    if (!regPassword) {
-      return "Password is required.";
-    }
-    if (regPassword.length < 8) {
-      return "Password must be at least 8 characters.";
-    }
-    if (regPassword !== confirmPassword) {
-      return "Password and confirmation do not match.";
-    }
+  function validateFormFields() {
+    if (!fullName.trim()) return "Full name is required.";
+    if (!regUsername.trim()) return "Username is required.";
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) return "Email is required.";
+    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) return "Enter a valid email address.";
+    if (!contactNumber.trim()) return "Contact number is required.";
+    if (!regPassword) return "Password is required.";
+    if (regPassword.length < 8) return "Password must be at least 8 characters.";
+    if (regPassword !== confirmPassword) return "Passwords do not match.";
     return "";
   }
 
-  async function handleSubmit() {
-    const validationError = validateForm();
+  // Step 1: validate form and send OTP
+  async function handleSendOTP() {
+    const validationError = validateFormFields();
     if (validationError) {
       setErrorMessage(validationError);
       return;
     }
-
     setBusy(true);
     setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await apiRequestRegisterOTP(email.trim());
+      setStep("otp");
+      setSuccessMessage(`OTP sent to ${email.trim()}. Check your inbox.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Step 2: verify OTP
+  async function handleVerifyOTP() {
+    const trimmedOtp = otpCode.trim();
+    if (!trimmedOtp || trimmedOtp.length !== 6 || !/^\d{6}$/.test(trimmedOtp)) {
+      setErrorMessage("Please enter the 6-digit OTP from your email.");
+      return;
+    }
+    setBusy(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await apiVerifyRegisterOTP(email.trim(), trimmedOtp);
+      // OTP verified — now submit registration
+      setSuccessMessage("Email verified! Creating your account…");
+      await handleCompleteRegistration();
+    } catch (error) {
+      setErrorMessage(error.message || "OTP verification failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Step 3: actually create the account
+  async function handleCompleteRegistration() {
     try {
       await apiRegister({
         full_name: fullName.trim(),
@@ -767,7 +829,22 @@ function RegisterModal({ visible, onClose, onRegistered }) {
       resetForm();
       onRegistered(regUsername.trim());
     } catch (error) {
-      setErrorMessage(error.message || "Registration failed.");
+      setErrorMessage(error.message || "Registration failed. Please try again.");
+      setSuccessMessage("");
+    }
+  }
+
+  // Resend OTP from OTP step
+  async function handleResendOTP() {
+    setBusy(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await apiRequestRegisterOTP(email.trim());
+      setOtpCode("");
+      setSuccessMessage("A new OTP has been sent to your email.");
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to resend OTP.");
     } finally {
       setBusy(false);
     }
@@ -786,68 +863,133 @@ function RegisterModal({ visible, onClose, onRegistered }) {
             showsVerticalScrollIndicator={false}
           >
             <View style={loginStyles.glassCard}>
-              <Text style={loginStyles.cardTitle}>Create Account</Text>
-              <Text style={loginStyles.cardHint}>Register a citizen account to report emergencies.</Text>
+              {/* Header */}
+              <Text style={loginStyles.cardTitle}>
+                {step === "form" ? "Create Account" : "Verify Email"}
+              </Text>
+              <Text style={loginStyles.cardHint}>
+                {step === "form"
+                  ? "Register a citizen account to report emergencies."
+                  : `Enter the 6-digit OTP sent to ${email.trim()}`}
+              </Text>
 
+              {/* Step indicator */}
+              <View style={loginStyles.otpStepRow}>
+                <View style={[loginStyles.otpStepDot, loginStyles.otpStepDotActive]} />
+                <View style={[loginStyles.otpStepLine, step !== "form" && loginStyles.otpStepLineActive]} />
+                <View style={[loginStyles.otpStepDot, step !== "form" && loginStyles.otpStepDotActive]} />
+                <View style={loginStyles.otpStepLine} />
+                <View style={loginStyles.otpStepDot} />
+              </View>
+
+              {successMessage ? <Text style={loginStyles.successBanner}>{successMessage}</Text> : null}
               {errorMessage ? <Text style={loginStyles.errorBanner}>{errorMessage}</Text> : null}
 
-              <LoginInputField
-                label="Full Name"
-                icon="person-outline"
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Your full name"
-                autoCapitalize="words"
-              />
-              <LoginInputField
-                label="Username"
-                icon="at-outline"
-                value={regUsername}
-                onChangeText={setRegUsername}
-                placeholder="Choose a username"
-                autoCapitalize="none"
-              />
-              <LoginInputField
-                label="Email"
-                icon="mail-outline"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-              <LoginInputField
-                label="Contact Number"
-                icon="call-outline"
-                value={contactNumber}
-                onChangeText={setContactNumber}
-                placeholder="Mobile number"
-                keyboardType="phone-pad"
-              />
-              <LoginInputField
-                label="Password"
-                icon="lock-closed-outline"
-                value={regPassword}
-                onChangeText={setRegPassword}
-                placeholder="At least 8 characters"
-                secureTextEntry
-              />
-              <LoginInputField
-                label="Confirm Password"
-                icon="lock-closed-outline"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Re-enter password"
-                secureTextEntry
-              />
+              {/* ── Step 1: Form ── */}
+              {step === "form" && (
+                <>
+                  <LoginInputField
+                    label="Full Name"
+                    icon="person-outline"
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder="Your full name"
+                    autoCapitalize="words"
+                  />
+                  <LoginInputField
+                    label="Username"
+                    icon="at-outline"
+                    value={regUsername}
+                    onChangeText={setRegUsername}
+                    placeholder="Choose a username"
+                    autoCapitalize="none"
+                  />
+                  <LoginInputField
+                    label="Email"
+                    icon="mail-outline"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@gmail.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <LoginInputField
+                    label="Contact Number"
+                    icon="call-outline"
+                    value={contactNumber}
+                    onChangeText={setContactNumber}
+                    placeholder="Mobile number"
+                    keyboardType="phone-pad"
+                  />
+                  <LoginInputField
+                    label="Password"
+                    icon="lock-closed-outline"
+                    value={regPassword}
+                    onChangeText={setRegPassword}
+                    placeholder="At least 8 characters"
+                    secureTextEntry
+                  />
+                  <LoginInputField
+                    label="Confirm Password"
+                    icon="lock-closed-outline"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Re-enter password"
+                    secureTextEntry
+                  />
+                  <Pressable
+                    style={[loginStyles.signInBtn, busy && loginStyles.btnDisabled]}
+                    onPress={handleSendOTP}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.signInBtnText}>
+                      {busy ? "Sending OTP…" : "Send OTP to Email"}
+                    </Text>
+                  </Pressable>
+                </>
+              )}
 
-              <Pressable
-                style={[loginStyles.signInBtn, busy && loginStyles.btnDisabled]}
-                onPress={handleSubmit}
-                disabled={busy}
-              >
-                <Text style={loginStyles.signInBtnText}>{busy ? "Creating…" : "Create Account"}</Text>
-              </Pressable>
+              {/* ── Step 2: OTP ── */}
+              {step === "otp" && (
+                <>
+                  <View style={loginStyles.otpInputWrap}>
+                    <Ionicons name="key-outline" size={20} color="#94a3b8" style={loginStyles.inputIcon} />
+                    <TextInput
+                      style={loginStyles.otpInput}
+                      value={otpCode}
+                      onChangeText={(t) => setOtpCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
+                      placeholder="000000"
+                      placeholderTextColor="#8b9cb3"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      autoFocus
+                    />
+                  </View>
+                  <Pressable
+                    style={[loginStyles.signInBtn, busy && loginStyles.btnDisabled]}
+                    onPress={handleVerifyOTP}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.signInBtnText}>
+                      {busy ? "Verifying…" : "Verify OTP & Create Account"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[loginStyles.cancelBtn, busy && loginStyles.btnDisabled]}
+                    onPress={handleResendOTP}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.cancelBtnText}>Resend OTP</Text>
+                  </Pressable>
+                  <Pressable
+                    style={loginStyles.cancelBtn}
+                    onPress={() => { setStep("form"); setErrorMessage(""); setSuccessMessage(""); }}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.cancelBtnText}>← Back to Form</Text>
+                  </Pressable>
+                </>
+              )}
 
               <Pressable style={loginStyles.cancelBtn} onPress={handleClose} disabled={busy}>
                 <Text style={loginStyles.cancelBtnText}>Cancel</Text>
@@ -860,6 +1002,235 @@ function RegisterModal({ visible, onClose, onRegistered }) {
   );
 }
 
+// =============================================================================
+// ForgotPasswordModal — 2-step OTP flow
+// Step 1: Enter email + request OTP
+// Step 2: Enter OTP + new password to reset
+// =============================================================================
+function ForgotPasswordModal({ visible, onClose, onResetSuccess }) {
+  const [step, setStep] = useState("email");
+  const [email, setEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  function resetForm() {
+    setStep("email");
+    setEmail("");
+    setOtpCode("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
+  function handleClose() {
+    if (busy) return;
+    resetForm();
+    onClose();
+  }
+
+  // Step 1: request OTP
+  async function handleRequestOTP() {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorMessage("Email is required.");
+      return;
+    }
+    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
+      setErrorMessage("Enter a valid email address.");
+      return;
+    }
+    setBusy(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await apiRequestPasswordResetOTP(trimmedEmail);
+      setStep("otp");
+      setSuccessMessage("If that email is registered, an OTP has been sent. Check your inbox.");
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Resend OTP
+  async function handleResendOTP() {
+    setBusy(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await apiRequestPasswordResetOTP(email.trim());
+      setOtpCode("");
+      setSuccessMessage("A new OTP has been sent to your email.");
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to resend OTP.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Step 2: reset password
+  async function handleResetPassword() {
+    const trimmedOtp = otpCode.trim();
+    if (!trimmedOtp || trimmedOtp.length !== 6 || !/^\d{6}$/.test(trimmedOtp)) {
+      setErrorMessage("Please enter the 6-digit OTP.");
+      return;
+    }
+    if (!newPassword) {
+      setErrorMessage("New password is required.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setErrorMessage("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      await apiResetPasswordWithOTP(email.trim(), trimmedOtp, newPassword);
+      resetForm();
+      onResetSuccess();
+    } catch (error) {
+      setErrorMessage(error.message || "Password reset failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <View style={loginStyles.modalBackdrop}>
+        <KeyboardAvoidingView
+          style={loginStyles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={loginStyles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={loginStyles.glassCard}>
+              <Text style={loginStyles.cardTitle}>Forgot Password</Text>
+              <Text style={loginStyles.cardHint}>
+                {step === "email"
+                  ? "Enter your registered Gmail to receive an OTP."
+                  : "Enter the OTP from your email and your new password."}
+              </Text>
+
+              {/* Step indicator */}
+              <View style={loginStyles.otpStepRow}>
+                <View style={[loginStyles.otpStepDot, loginStyles.otpStepDotActive]} />
+                <View style={[loginStyles.otpStepLine, step === "otp" && loginStyles.otpStepLineActive]} />
+                <View style={[loginStyles.otpStepDot, step === "otp" && loginStyles.otpStepDotActive]} />
+              </View>
+
+              {successMessage ? <Text style={loginStyles.successBanner}>{successMessage}</Text> : null}
+              {errorMessage ? <Text style={loginStyles.errorBanner}>{errorMessage}</Text> : null}
+
+              {/* ── Step 1: Email ── */}
+              {step === "email" && (
+                <>
+                  <LoginInputField
+                    label="Gmail Address"
+                    icon="mail-outline"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@gmail.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <Pressable
+                    style={[loginStyles.signInBtn, busy && loginStyles.btnDisabled]}
+                    onPress={handleRequestOTP}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.signInBtnText}>
+                      {busy ? "Sending OTP…" : "Send OTP"}
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+
+              {/* ── Step 2: OTP + new password ── */}
+              {step === "otp" && (
+                <>
+                  <View style={loginStyles.otpInputWrap}>
+                    <Ionicons name="key-outline" size={20} color="#94a3b8" style={loginStyles.inputIcon} />
+                    <TextInput
+                      style={loginStyles.otpInput}
+                      value={otpCode}
+                      onChangeText={(t) => setOtpCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
+                      placeholder="000000"
+                      placeholderTextColor="#8b9cb3"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      autoFocus
+                    />
+                  </View>
+                  <LoginInputField
+                    label="New Password"
+                    icon="lock-closed-outline"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="At least 8 characters"
+                    secureTextEntry
+                  />
+                  <LoginInputField
+                    label="Confirm New Password"
+                    icon="lock-closed-outline"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Re-enter new password"
+                    secureTextEntry
+                  />
+                  <Pressable
+                    style={[loginStyles.signInBtn, busy && loginStyles.btnDisabled]}
+                    onPress={handleResetPassword}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.signInBtnText}>
+                      {busy ? "Resetting…" : "Reset Password"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[loginStyles.cancelBtn, busy && loginStyles.btnDisabled]}
+                    onPress={handleResendOTP}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.cancelBtnText}>Resend OTP</Text>
+                  </Pressable>
+                  <Pressable
+                    style={loginStyles.cancelBtn}
+                    onPress={() => { setStep("email"); setErrorMessage(""); setSuccessMessage(""); }}
+                    disabled={busy}
+                  >
+                    <Text style={loginStyles.cancelBtnText}>← Back</Text>
+                  </Pressable>
+                </>
+              )}
+
+              <Pressable style={loginStyles.cancelBtn} onPress={handleClose} disabled={busy}>
+                <Text style={loginStyles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+
 function LoginScreen({
   username,
   password,
@@ -867,6 +1238,7 @@ function LoginScreen({
   onPasswordChange,
   onLogin,
   onCreateAccount,
+  onForgotPassword,
   staySignedIn,
   onStaySignedInChange,
   busy,
@@ -874,13 +1246,6 @@ function LoginScreen({
   successMessage,
 }) {
   const [showPassword, setShowPassword] = useState(false);
-
-  function handleForgotPassword() {
-    Alert.alert(
-      "Forgot Password",
-      "Contact your local DRRM office to reset your citizen account password."
-    );
-  }
 
   return (
     <LinearGradient colors={["#071426", "#0b2a4a", "#0a2238"]} style={loginStyles.gradient}>
@@ -933,7 +1298,8 @@ function LoginScreen({
                 />
                 <Text style={loginStyles.staySignedInText}>Stay signed in</Text>
               </View>
-              <Pressable onPress={handleForgotPassword} hitSlop={8}>
+              {/* Forgot Password — opens ForgotPasswordModal, not a static alert */}
+              <Pressable onPress={onForgotPassword} hitSlop={8}>
                 <Text style={loginStyles.forgotLink}>Forgot Password?</Text>
               </Pressable>
             </View>
@@ -958,6 +1324,7 @@ function LoginScreen({
     </LinearGradient>
   );
 }
+
 
 const DESCRIPTION_MAX = 500;
 const SILAY_CITY_LAT = 10.7999;
@@ -2579,6 +2946,7 @@ export default function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [registerVisible, setRegisterVisible] = useState(false);
+  const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
@@ -2959,6 +3327,7 @@ export default function App() {
             onPasswordChange={handlePasswordChange}
             onLogin={handleLogin}
             onCreateAccount={() => setRegisterVisible(true)}
+            onForgotPassword={() => setForgotPasswordVisible(true)}
             staySignedIn={staySignedIn}
             onStaySignedInChange={setStaySignedIn}
             busy={signingIn}
@@ -2969,6 +3338,14 @@ export default function App() {
             visible={registerVisible}
             onClose={() => setRegisterVisible(false)}
             onRegistered={handleRegistered}
+          />
+          <ForgotPasswordModal
+            visible={forgotPasswordVisible}
+            onClose={() => setForgotPasswordVisible(false)}
+            onResetSuccess={() => {
+              setForgotPasswordVisible(false);
+              setLoginSuccess("Password reset successful. Please sign in with your new password.");
+            }}
           />
         </SafeAreaView>
       ) : (
@@ -3565,6 +3942,53 @@ const loginStyles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.65,
+  },
+  // OTP step indicator
+  otpStepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+    marginVertical: 4,
+  },
+  otpStepDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  otpStepDotActive: {
+    backgroundColor: "#2563eb",
+  },
+  otpStepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    maxWidth: 40,
+  },
+  otpStepLineActive: {
+    backgroundColor: "#2563eb",
+  },
+  // OTP input — large, centered, number-pad style
+  otpInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 2,
+    borderColor: "#2563eb",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    minHeight: 64,
+    justifyContent: "center",
+  },
+  otpInput: {
+    flex: 1,
+    color: "#ffffff",
+    fontSize: 32,
+    fontWeight: "800",
+    letterSpacing: 12,
+    textAlign: "center",
+    paddingVertical: Platform.OS === "ios" ? 14 : 10,
   },
 });
 

@@ -7,7 +7,7 @@ const ROLE_OPTIONS = [
   {
     id: "ADMIN",
     label: "Admin",
-    placeholder: "e.g. admin",
+    placeholder: "",
     accent: "warm",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -25,7 +25,7 @@ const ROLE_OPTIONS = [
   {
     id: "DRRM",
     label: "DRRM",
-    placeholder: "e.g. drrm",
+    placeholder: "",
     accent: "warm",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -42,7 +42,7 @@ const ROLE_OPTIONS = [
   {
     id: "BFP",
     label: "BFP",
-    placeholder: "e.g. bfp",
+    placeholder: " bfp",
     accent: "cool",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -59,7 +59,7 @@ const ROLE_OPTIONS = [
   {
     id: "POLICE",
     label: "Police",
-    placeholder: "e.g. police",
+    placeholder: "",
     accent: "cool",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -134,9 +134,8 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
                   type="button"
                   role="tab"
                   aria-selected={selectedRole === role.id}
-                  className={`command-login__role command-login__role--${role.accent}${
-                    selectedRole === role.id ? " command-login__role--active" : ""
-                  }`}
+                  className={`command-login__role command-login__role--${role.accent}${selectedRole === role.id ? " command-login__role--active" : ""
+                    }`}
                   onClick={() => setSelectedRole(role.id)}
                 >
                   <span className="command-login__role-icon">{role.icon}</span>
@@ -179,7 +178,7 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder={focusedField === "username" ? activeRole.placeholder : ""}
+                    placeholder=""
                     onFocus={() => setFocusedField("username")}
                     onBlur={() => setFocusedField(null)}
                     autoComplete="username"
