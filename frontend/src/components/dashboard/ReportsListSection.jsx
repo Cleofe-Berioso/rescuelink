@@ -4,7 +4,7 @@ import ErrorMessage from "../ErrorMessage";
 import LoadingState from "../LoadingState";
 import ReportCard from "../ReportCard";
 import CompactReportCard from "./CompactReportCard";
-import ReportDetailsPanel from "./ReportDetailsPanel";
+import ReportDetailsModal from "./ReportDetailsModal";
 import ReportSearchSortBar from "./ReportSearchSortBar";
 import ReportPagination from "./ReportPagination";
 import {
@@ -19,23 +19,6 @@ import {
 } from "../../utils/reportListUtils";
 import ReportActions from "./ReportActions";
 import ReportFilters from "./ReportFilters";
-
-function useMatchMedia(query) {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, [query]);
-
-  return matches;
-}
 
 export default function ReportsListSection({
   title,
@@ -65,13 +48,11 @@ export default function ReportsListSection({
   const source = allReports ?? reports;
   const filterCounts = buildFilterCounts(source, role);
   const filteredReports = filterReportsByStatus(reports, statusFilter, role);
-  const isMobilePanel = useMatchMedia("(max-width: 1100px)");
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
-  const [selectedReportId, setSelectedReportId] = useState(null);
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [modalReportId, setModalReportId] = useState(null);
 
   useEffect(() => {
     setPage(1);
@@ -106,42 +87,24 @@ export default function ReportsListSection({
 
   const listReports = priorityEmpty ? source : visibleReports;
 
-  useEffect(() => {
-    if (!queueLayout) return;
-    if (!listReports.length) {
-      setSelectedReportId(null);
-      setMobilePanelOpen(false);
-      return;
-    }
-    const stillVisible = listReports.some((item) => item.id === selectedReportId);
-    if (!stillVisible) {
-      setSelectedReportId(listReports[0].id);
-    }
-  }, [listReports, queueLayout, selectedReportId]);
+  const modalReport = useMemo(() => {
+    if (!modalReportId) return null;
+    return reports.find((item) => item.id === modalReportId) || null;
+  }, [reports, modalReportId]);
 
-  const selectedLiveReport = useMemo(() => {
-    if (!selectedReportId) return null;
-    return reports.find((item) => item.id === selectedReportId) || null;
-  }, [reports, selectedReportId]);
+  const modalUnitResponses = modalReportId ? responsesByReport[modalReportId] || [] : [];
 
-  const selectedUnitResponses = selectedReportId
-    ? responsesByReport[selectedReportId] || []
-    : [];
-
-  function handleSelectReport(report) {
-    setSelectedReportId(report.id);
-    if (isMobilePanel) {
-      setMobilePanelOpen(true);
-    }
+  function handleOpenDetails(report) {
+    setModalReportId(report.id);
   }
 
-  function handleMobileClose() {
-    setMobilePanelOpen(false);
+  function handleCloseDetails() {
+    setModalReportId(null);
   }
 
   if (queueLayout) {
     return (
-      <div className="reports-workspace reports-workspace--fixed">
+      <div className="reports-workspace reports-workspace--fixed reports-workspace--full">
         <section className="reports-list-pane">
           <div className="reports-list-header">
             <header className="reports-workspace__header">
@@ -189,8 +152,8 @@ export default function ReportsListSection({
                   report={report}
                   token={token}
                   unitResponses={responsesByReport[report.id] || []}
-                  onSelect={handleSelectReport}
-                  isSelected={selectedReportId === report.id}
+                  onViewDetails={handleOpenDetails}
+                  isActive={modalReportId === report.id}
                 />
               ))}
 
@@ -218,30 +181,16 @@ export default function ReportsListSection({
           </div>
         </section>
 
-        <aside className="report-detail-pane reports-workspace__detail--desktop">
-          <ReportDetailsPanel
-            report={selectedLiveReport}
+        {modalReport ? (
+          <ReportDetailsModal
+            report={modalReport}
             token={token}
             config={config}
-            unitResponses={selectedUnitResponses}
+            unitResponses={modalUnitResponses}
             statusHistory={statusHistory}
+            onClose={handleCloseDetails}
             onChanged={onReload}
             actionsMode={actionsMode}
-            mode="embedded"
-          />
-        </aside>
-
-        {isMobilePanel && mobilePanelOpen && selectedLiveReport ? (
-          <ReportDetailsPanel
-            report={selectedLiveReport}
-            token={token}
-            config={config}
-            unitResponses={selectedUnitResponses}
-            statusHistory={statusHistory}
-            onClose={handleMobileClose}
-            onChanged={onReload}
-            actionsMode={actionsMode}
-            mode="modal"
           />
         ) : null}
       </div>

@@ -1,13 +1,27 @@
 const FLAG_LABELS = {
   SPAM: "Possible Spam",
+  POSSIBLE_SPAM: "Possible Spam",
   DUPLICATE_REPORT: "Duplicate Pic",
+  DUPLICATE_PIC: "Duplicate Pic",
   REVIEW: "Needs Verification",
 };
 
+function formatFlagLabel(raw) {
+  if (!raw) return "";
+  const normalized = String(raw).toUpperCase();
+  if (FLAG_LABELS[normalized]) return FLAG_LABELS[normalized];
+  if (FLAG_LABELS[raw]) return FLAG_LABELS[raw];
+  return String(raw)
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .trim();
+}
+
 export function getReportFlagLabel(report) {
   if (!report?.is_flagged && !report?.needs_verification) return "";
-  if (report.flag_type && FLAG_LABELS[report.flag_type]) {
-    return FLAG_LABELS[report.flag_type];
+  if (report.flag_type) {
+    const label = formatFlagLabel(report.flag_type);
+    if (label) return label;
   }
   if (report.needs_verification) return "Needs Verification";
   return "Flagged";

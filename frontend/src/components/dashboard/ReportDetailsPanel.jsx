@@ -10,7 +10,8 @@ import {
   getReportSuggestedUnits,
   hasAiAnalysis,
 } from "../../utils/reportPriority";
-import { formatRelativeTime, getReportLocation } from "../../utils/reportListUtils";
+import { formatRelativeTime, getReportLocation, getReportTitle } from "../../utils/reportListUtils";
+import IncidentLocationMap from "./IncidentLocationMap";
 
 function formatReportDate(iso) {
   if (!iso) return "—";
@@ -141,7 +142,7 @@ function UpdatesTab({ entries }) {
   );
 }
 
-export default function ReportDetailsPanel({
+export default function ReportDetailsContent({
   report,
   token,
   config,
@@ -150,26 +151,12 @@ export default function ReportDetailsPanel({
   onClose,
   onChanged,
   actionsMode = "full",
-  mode = "embedded",
 }) {
   const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
     setActiveTab("details");
   }, [report?.id]);
-
-  useEffect(() => {
-    if (mode !== "modal" || !onClose) return undefined;
-    function onKeyDown(event) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [mode, onClose]);
 
   const reportHistory = useMemo(
     () =>
@@ -183,29 +170,22 @@ export default function ReportDetailsPanel({
 
   const dispatchEntry = reportHistory.find((entry) => entry.status === "DISPATCHED");
 
-  if (!report) {
-    return (
-      <aside className={`report-detail-panel report-detail-panel--empty report-detail-panel--${mode}`}>
-        <div className="report-detail-panel__placeholder">
-          <p className="report-detail-panel__placeholder-title">Select a report to view details</p>
-          <p className="report-detail-panel__placeholder-desc">
-            Choose a report from the queue to review incident information, respond, and update status.
-          </p>
-        </div>
-      </aside>
-    );
-  }
+  if (!report) return null;
 
   const responseCount = unitResponses.length;
-  const statusLabel = (report.status || "").replace(/_/g, " ");
 
-  const panelContent = (
-    <>
+  return (
+    <article className="report-detail-panel report-detail-panel--modal">
       <div className="report-detail-panel__chrome">
         <header className="report-detail-panel__header">
           <div className="report-detail-panel__title-row">
-            <h2 className="report-detail-panel__title">Report #{report.id}</h2>
-            {mode === "modal" && onClose ? (
+            <div>
+              <h2 className="report-detail-panel__title" id="report-details-title">
+                Report #{report.id}
+              </h2>
+              <p className="report-detail-panel__incident-title">{getReportTitle(report)}</p>
+            </div>
+            {onClose ? (
               <button type="button" className="report-detail-panel__close" onClick={onClose} aria-label="Close">
                 ×
               </button>
@@ -245,19 +225,13 @@ export default function ReportDetailsPanel({
             </section>
 
             <section className="report-detail-info-card">
-              <h3 className="report-detail-section__title">Location</h3>
-              <dl className="report-detail-info-card__grid">
-                <div className="report-detail-info-card__wide">
-                  <dt>Location</dt>
-                  <dd>{getReportLocation(report)}</dd>
-                </div>
-                <div className="report-detail-info-card__wide">
-                  <dt>Coordinates</dt>
-                  <dd>
-                    {report.latitude}, {report.longitude}
-                  </dd>
-                </div>
-              </dl>
+              <h3 className="report-detail-section__title">Address</h3>
+              <p className="report-detail-section__text">{getReportLocation(report)}</p>
+            </section>
+
+            <section className="report-detail-info-card report-detail-info-card--map">
+              <h3 className="report-detail-section__title">Incident Location</h3>
+              <IncidentLocationMap report={report} />
             </section>
 
             <section className="report-detail-info-card">
@@ -315,28 +289,6 @@ export default function ReportDetailsPanel({
 
         {activeTab === "updates" ? <UpdatesTab entries={reportHistory} /> : null}
       </div>
-    </>
-  );
-
-  if (mode === "modal") {
-    return (
-      <div className="report-detail-modal" role="presentation">
-        <button
-          type="button"
-          className="report-detail-modal__backdrop"
-          aria-label="Close report details"
-          onClick={onClose}
-        />
-        <aside className="report-detail-panel report-detail-panel--modal" role="dialog" aria-modal="true">
-          {panelContent}
-        </aside>
-      </div>
-    );
-  }
-
-  return (
-    <aside className="report-detail-panel report-detail-panel--embedded" aria-label={`Report ${report.id} details`}>
-      {panelContent}
-    </aside>
+    </article>
   );
 }

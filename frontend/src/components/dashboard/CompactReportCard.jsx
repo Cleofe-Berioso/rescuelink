@@ -41,35 +41,19 @@ export default function CompactReportCard({
   report,
   token,
   unitResponses = [],
-  onSelect,
-  isSelected = false,
+  onViewDetails,
+  isActive = false,
 }) {
   const showAi = hasAiAnalysis(report);
   const criticalLevel = (report.critical_level || "LOW").toUpperCase();
   const title = getReportTitle(report);
   const location = getReportLocation(report);
 
-  function handleSelect() {
-    onSelect(report);
-  }
-
-  function handleKeyDown(event) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      handleSelect();
-    }
-  }
-
   return (
     <article
-      className={`compact-report-card${isSelected ? " compact-report-card--selected" : ""}${
+      className={`compact-report-card${isActive ? " compact-report-card--selected" : ""}${
         report.is_priority ? " compact-report-card--priority" : ""
       }${criticalLevel === "CRITICAL" ? " compact-report-card--critical" : ""}`}
-      onClick={handleSelect}
-      onKeyDown={handleKeyDown}
-      role="button"
-      tabIndex={0}
-      aria-pressed={isSelected}
       aria-label={`Report ${report.id}, ${title}`}
     >
       <div className="compact-report-card__left">
@@ -112,10 +96,7 @@ export default function CompactReportCard({
         <button
           type="button"
           className="btn btn--primary btn--sm compact-report-card__view-btn"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleSelect();
-          }}
+          onClick={() => onViewDetails(report)}
         >
           View Details
         </button>
