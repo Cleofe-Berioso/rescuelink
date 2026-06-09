@@ -172,7 +172,7 @@ export default function ReportsListSection({
 
             {priorityEmpty ? (
               <p className="reports-panel__priority-note" role="status">
-                0 AI-priority reports · showing all reports
+                0 priority reports · showing all reports
               </p>
             ) : null}
 
@@ -272,7 +272,7 @@ export default function ReportsListSection({
 
       {priorityEmpty ? (
         <p className="reports-panel__priority-note" role="status">
-          0 AI-priority reports · showing all reports
+          0 priority reports · showing all reports
         </p>
       ) : null}
 
@@ -314,7 +314,7 @@ export default function ReportsListSection({
               (statusFilter === "ALL"
                 ? "New emergency reports from citizens will appear here for manual review."
                 : statusFilter === "PRIORITY"
-                  ? "No AI-priority reports right now. All reports remain available under All."
+                  ? "No priority reports right now. All reports remain available under All."
                   : "Try another filter or wait for new incidents.")
             }
             actionLabel={emptyActionLabel}

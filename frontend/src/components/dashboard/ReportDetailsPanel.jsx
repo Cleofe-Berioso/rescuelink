@@ -50,7 +50,7 @@ function AbuseReviewCard({ report }) {
         ) : null}
         {report.flag_reason ? (
           <div className="report-detail-ai__wide">
-            <dt>AI / Rule Reason</dt>
+            <dt>System / Rule Reason</dt>
             <dd>{report.flag_reason}</dd>
           </div>
         ) : null}
@@ -66,7 +66,7 @@ function AiAssessmentCard({ report }) {
 
   return (
     <section className="report-detail-ai">
-      <h3 className="report-detail-section__title"></h3>
+      <h3 className="report-detail-section__title">System review</h3>
       <dl className="report-detail-ai__grid">
         <div>
           <dt>Priority Level</dt>
@@ -102,7 +102,7 @@ function AiAssessmentCard({ report }) {
         ) : null}
         {typeof report.ai_confidence === "number" ? (
           <div>
-            <dt>Confidence</dt>
+            <dt>Review score</dt>
             <dd>{report.ai_confidence}%</dd>
           </div>
         ) : null}

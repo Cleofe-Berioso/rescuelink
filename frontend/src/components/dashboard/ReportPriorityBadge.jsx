@@ -12,9 +12,11 @@ export default function ReportPriorityBadge({ level, isPriority = false, compact
           ? "medium"
           : "low";
 
+  const label = isPriority ? "Priority" : formatPriorityLevel(level);
+
   return (
     <span className={`report-priority-badge report-priority-badge--${tone}${compact ? " report-priority-badge--compact" : ""}`}>
-      {compact ? formatPriorityLevel(level) : `Priority · ${formatPriorityLevel(level)}`}
+      {label}
     </span>
   );
 }

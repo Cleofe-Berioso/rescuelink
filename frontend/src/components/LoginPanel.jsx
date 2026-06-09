@@ -84,28 +84,12 @@ const ROLE_OPTIONS = [
 function RescueLinkBrand() {
   return (
     <header className="command-login__brand">
-      <div className="command-login__logo" aria-hidden="true">
-        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M24 4L8 14v12c0 8.8 6.4 17 16 20 9.6-3 16-11.2 16-20V14L24 4z"
-            fill="url(#shieldGrad)"
-            stroke="rgba(255,255,255,0.25)"
-            strokeWidth="1"
-          />
-          <path
-            d="M18 24c0-3.3 2.7-6 6-6s6 2.7 6 6-2.7 6-6 6"
-            stroke="#fff"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <path d="M24 18v12M18 24h12" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-          <defs>
-            <linearGradient id="shieldGrad" x1="8" y1="4" x2="40" y2="46">
-              <stop stopColor="#dc2626" />
-              <stop offset="1" stopColor="#991b1b" />
-            </linearGradient>
-          </defs>
-        </svg>
+      <div className="command-login__logo">
+        <img
+          src="/icon.png"
+          alt="RescueLink Logo"
+          className="command-login__logo-img"
+        />
       </div>
       <div className="command-login__brand-text">
         <h1 className="command-login__title">
@@ -123,6 +107,7 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [staySignedIn, setStaySignedIn] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
 
   const activeRole = ROLE_OPTIONS.find((role) => role.id === selectedRole) || ROLE_OPTIONS[1];
   const infoCard = getLoginInfoCard(selectedRole);
@@ -177,8 +162,7 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
                 </div>
               ) : null}
 
-              <label className="command-login__field">
-                <span className="command-login__field-label">Username</span>
+              <label className={`command-login__field command-login__field--floating ${username || focusedField === "username" ? "is-floating" : ""} ${focusedField === "username" ? "is-focused" : ""}`}>
                 <span className="command-login__input-wrap">
                   <span className="command-login__input-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
@@ -195,15 +179,17 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder={activeRole.placeholder}
+                    placeholder={focusedField === "username" ? activeRole.placeholder : ""}
+                    onFocus={() => setFocusedField("username")}
+                    onBlur={() => setFocusedField(null)}
                     autoComplete="username"
                     required
                   />
+                  <span className="command-login__floating-label">Username</span>
                 </span>
               </label>
 
-              <label className="command-login__field">
-                <span className="command-login__field-label">Password</span>
+              <label className={`command-login__field command-login__field--floating ${password || focusedField === "password" ? "is-floating" : ""} ${focusedField === "password" ? "is-focused" : ""}`}>
                 <span className="command-login__input-wrap">
                   <span className="command-login__input-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
@@ -220,10 +206,13 @@ export default function LoginPanel({ onLogin, busy, errorMessage }) {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder=""
+                    onFocus={() => setFocusedField("password")}
+                    onBlur={() => setFocusedField(null)}
                     autoComplete="current-password"
                     required
                   />
+                  <span className="command-login__floating-label">Password</span>
                   <button
                     type="button"
                     className="command-login__toggle-password"

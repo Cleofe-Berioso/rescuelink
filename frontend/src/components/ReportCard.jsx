@@ -51,19 +51,12 @@ export default function ReportCard({
           <span className="report-card__time">{formatReportDate(report.created_at)}</span>
         </div>
         <div className="report-card__badges">
-          {report.is_priority ? (
-            <span className="priority-badge">
-              Priority · {formatPriorityLevel(report.priority_level)}
+          {showAi && (report.critical_level || "").toUpperCase() !== "LOW" ? (
+            <span className={getCriticalLevelClass(report.critical_level)} title="Severity level">
+              {formatPriorityLevel(report.critical_level)}
             </span>
           ) : null}
-          {showAi ? (
-            <span
-              className={getCriticalLevelClass(report.critical_level)}
-              title="AI-assessed critical level"
-            >
-              Critical Level: {formatPriorityLevel(report.critical_level)}
-            </span>
-          ) : null}
+          {report.is_priority ? <span className="priority-badge">Priority</span> : null}
           {report.detected_incident_type ? (
             <span className="incident-type-badge">{report.detected_incident_type}</span>
           ) : null}
@@ -95,7 +88,7 @@ export default function ReportCard({
           <p className="report-card__ai-reason-label">Priority reason</p>
           <p>{report.ai_priority_reason}</p>
           {typeof report.ai_confidence === "number" ? (
-            <p className="report-card__ai-confidence">Confidence: {report.ai_confidence}%</p>
+            <p className="report-card__ai-confidence">Review score: {report.ai_confidence}%</p>
           ) : null}
         </div>
       ) : null}

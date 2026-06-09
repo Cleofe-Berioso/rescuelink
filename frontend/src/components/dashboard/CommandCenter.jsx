@@ -53,7 +53,7 @@ export default function CommandCenter({
                   <>
                     <p className="priority-watch__count">{priorityCount}</p>
                     <p className="card__desc">
-                      AI-priority report{priorityCount === 1 ? "" : "s"} requiring manual review
+                      Priority report{priorityCount === 1 ? "" : "s"} requiring manual review
                     </p>
                   </>
                 ) : (

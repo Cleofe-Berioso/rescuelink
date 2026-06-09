@@ -1,6 +1,6 @@
 const FLAG_LABELS = {
   SPAM: "Possible Spam",
-  DUPLICATE_REPORT: "Suspicious Duplicate",
+  DUPLICATE_REPORT: "Duplicate Pic",
   REVIEW: "Needs Verification",
 };
 

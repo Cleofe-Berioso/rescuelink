@@ -76,13 +76,13 @@ export default function CompactReportCard({
         <div className="compact-report-card__id-row">
           <span className="compact-report-card__id">#{report.id}</span>
           <div className="compact-report-card__badges">
-            {report.is_priority ? (
-              <ReportPriorityBadge level={report.priority_level} isPriority compact />
-            ) : null}
             {showAi && criticalLevel !== "LOW" ? (
               <span className={`report-priority-badge report-priority-badge--${criticalLevel.toLowerCase()} report-priority-badge--compact`}>
                 {formatPriorityLevel(report.critical_level)}
               </span>
+            ) : null}
+            {report.is_priority ? (
+              <ReportPriorityBadge level={report.priority_level} isPriority compact />
             ) : null}
             {hasReportFlag(report) ? <ReportFlagBadge report={report} compact /> : null}
           </div>

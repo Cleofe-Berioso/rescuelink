@@ -34,19 +34,17 @@ export function ReportDetailHeaderBadges({ report }) {
 
   return (
     <div className="report-detail-panel__badges">
-      {report.is_priority ? (
-        <span className="report-detail-panel__priority-tag">
-          {(report.priority_level || "HIGH").toUpperCase()} PRIORITY
-        </span>
-      ) : report.priority_level ? (
-        <ReportPriorityBadge level={report.priority_level} />
-      ) : null}
-      {hasReportFlag(report) ? <ReportFlagBadge report={report} /> : null}
       {hasAiAnalysis(report) && critical !== "LOW" ? (
         <span className={`report-detail-panel__critical-tag report-detail-panel__critical-tag--${critical.toLowerCase()}`}>
           {critical}
         </span>
       ) : null}
+      {report.is_priority ? (
+        <span className="report-detail-panel__priority-tag">Priority</span>
+      ) : report.priority_level ? (
+        <ReportPriorityBadge level={report.priority_level} />
+      ) : null}
+      {hasReportFlag(report) ? <ReportFlagBadge report={report} /> : null}
     </div>
   );
 }

@@ -30,12 +30,17 @@
 .command-login__logo {
   width: 72px;
   height: 72px;
-  filter: drop-shadow(0 0 24px rgba(220, 38, 38, 0.45));
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
 }
 
-.command-login__logo svg {
-  width: 100%;
-  height: 100%;
+.command-login__logo-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 18px rgba(239, 68, 68, 0.35));
 }
 
 .command-login__title {
@@ -184,6 +189,12 @@
   gap: 8px;
 }
 
+.command-login__field--floating {
+  position: relative;
+  padding-top: 14px;
+  gap: 0;
+}
+
 .command-login__field-label {
   font-size: 0.82rem;
   font-weight: 600;
@@ -192,6 +203,7 @@
 }
 
 .command-login__input-wrap {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -201,11 +213,37 @@
   border: 1px solid rgba(96, 165, 250, 0.25);
   background: rgba(255, 255, 255, 0.05);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
 }
 
-.command-login__input-wrap:focus-within {
+.command-login__input-wrap:focus-within,
+.command-login__field.is-focused .command-login__input-wrap {
   border-color: rgba(96, 165, 250, 0.55);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.command-login__floating-label {
+  position: absolute;
+  left: 42px;
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  font-size: 0.95rem;
+  color: #64748b;
+  pointer-events: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.command-login__field.is-floating .command-login__floating-label {
+  top: -14px;
+  left: 2px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.command-login__field.is-focused.is-floating .command-login__floating-label {
+  color: #60a5fa;
 }
 
 .command-login__input-icon {

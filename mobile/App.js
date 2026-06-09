@@ -24,6 +24,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import FloatingInput from "./FloatingInput";
 
 // Django API base URL — set EXPO_PUBLIC_API_BASE_URL in .env or app.config.js extra.apiBaseUrl.
 // For Expo Go on a physical device, use an HTTPS tunnel to Django (port 8000), not the Metro tunnel.
@@ -865,7 +866,6 @@ function LoginScreen({
   onUsernameChange,
   onPasswordChange,
   onLogin,
-  onFillDemo,
   onCreateAccount,
   staySignedIn,
   onStaySignedInChange,
@@ -873,6 +873,8 @@ function LoginScreen({
   errorMessage,
   successMessage,
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   function handleForgotPassword() {
     Alert.alert(
       "Forgot Password",
@@ -903,22 +905,22 @@ function LoginScreen({
             {successMessage ? <Text style={loginStyles.successBanner}>{successMessage}</Text> : null}
             {errorMessage ? <Text style={loginStyles.errorBanner}>{errorMessage}</Text> : null}
 
-            <LoginInputField
+            <FloatingInput
               label="Username"
               icon="person-outline"
               value={username}
               onChangeText={onUsernameChange}
-              placeholder="Enter username"
               autoCapitalize="none"
             />
 
-            <LoginInputField
+            <FloatingInput
               label="Password"
               icon="lock-closed-outline"
               value={password}
               onChangeText={onPasswordChange}
-              placeholder="••••••••"
-              secureTextEntry
+              secureTextEntry={!showPassword}
+              rightIcon={showPassword ? "eye-off-outline" : "eye-outline"}
+              onRightIconPress={() => setShowPassword(!showPassword)}
             />
 
             <View style={loginStyles.formRow}>
@@ -951,10 +953,6 @@ function LoginScreen({
               </Pressable>
             </View>
           </View>
-
-          <Pressable onPress={onFillDemo} style={loginStyles.demoWrap}>
-            <Text style={loginStyles.demoLink}>Use Demo Account</Text>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -2960,7 +2958,6 @@ export default function App() {
             onUsernameChange={handleUsernameChange}
             onPasswordChange={handlePasswordChange}
             onLogin={handleLogin}
-            onFillDemo={fillDemoCredentials}
             onCreateAccount={() => setRegisterVisible(true)}
             staySignedIn={staySignedIn}
             onStaySignedInChange={setStaySignedIn}
@@ -3532,17 +3529,6 @@ const loginStyles = StyleSheet.create({
     color: "#60a5fa",
     fontSize: 14,
     fontWeight: "700",
-  },
-  demoWrap: {
-    marginTop: 18,
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  demoLink: {
-    color: "#94a3b8",
-    fontSize: 14,
-    fontWeight: "600",
-    textDecorationLine: "underline",
   },
   sessionLoading: {
     flex: 1,

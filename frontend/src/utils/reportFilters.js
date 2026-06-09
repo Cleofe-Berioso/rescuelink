@@ -33,9 +33,9 @@ export function getFilterSubtitle(filterKey, counts, role) {
   if (filterKey === "PRIORITY") {
     const matchCount = counts.PRIORITY ?? 0;
     if (matchCount === 0) {
-      return "0 AI-priority reports · showing all reports";
+      return "0 priority reports · showing all reports";
     }
-    return `${matchCount} AI-priority report${matchCount === 1 ? "" : "s"}`;
+    return `${matchCount} priority report${matchCount === 1 ? "" : "s"}`;
   }
   if (filterKey === "NEEDS_RESPONSE") {
     const count = counts.NEEDS_RESPONSE ?? 0;
