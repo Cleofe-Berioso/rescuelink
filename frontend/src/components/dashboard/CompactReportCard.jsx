@@ -46,6 +46,7 @@ export default function CompactReportCard({
 }) {
   const showAi = hasAiAnalysis(report);
   const criticalLevel = (report.critical_level || "LOW").toUpperCase();
+  const priorityLevel = report.ai_priority || report.priority_level;
   const title = getReportTitle(report);
   const location = getReportLocation(report);
 
@@ -60,15 +61,13 @@ export default function CompactReportCard({
         <div className="compact-report-card__id-row">
           <span className="compact-report-card__id">#{report.id}</span>
           <div className="compact-report-card__badges">
-            {showAi && (report.ai_criticality || report.critical_level || "LOW").toUpperCase() !== "LOW" ? (
-              <span className={`report-priority-badge report-priority-badge--${(report.ai_criticality || report.critical_level).toLowerCase()} report-priority-badge--compact`}>
-                {formatPriorityLevel(report.ai_criticality || report.critical_level)}
+            {showAi && criticalLevel !== "LOW" ? (
+              <span className={`report-priority-badge report-priority-badge--${criticalLevel.toLowerCase()} report-priority-badge--compact`}>
+                {formatPriorityLevel(report.critical_level)}
               </span>
             ) : null}
-            {report.ai_priority ? (
-              <ReportPriorityBadge level={report.ai_priority} isPriority={report.ai_priority === "HIGH" || report.ai_priority === "CRITICAL"} compact />
-            ) : report.is_priority ? (
-              <ReportPriorityBadge level={report.priority_level} isPriority compact />
+            {(report.is_priority || report.ai_priority) && priorityLevel ? (
+              <ReportPriorityBadge level={priorityLevel} isPriority compact />
             ) : null}
             {hasReportFlag(report) ? <ReportFlagBadge report={report} compact /> : null}
           </div>

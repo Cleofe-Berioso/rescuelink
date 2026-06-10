@@ -78,8 +78,8 @@ function AiAssessmentCard({ report }) {
           <dd>{report.ai_criticality ? report.ai_criticality.replace(/_/g, " ") : formatPriorityLevel(report.critical_level)}</dd>
         </div>
         <div>
-          <dt>AI Category</dt>
-          <dd>{(report.ai_incident_category || report.detected_incident_type || "—").toUpperCase()}</dd>
+          <dt>AI Incident Category</dt>
+          <dd>{(report.ai_incident_category || report.detected_incident_type || "—").replace(/_/g, " ")}</dd>
         </div>
         {report.ai_source ? (
           <div>
@@ -107,7 +107,7 @@ function AiAssessmentCard({ report }) {
         ) : null}
         {typeof report.ai_confidence === "number" ? (
           <div>
-            <dt>Confidence</dt>
+            <dt>AI Confidence</dt>
             <dd>{report.ai_confidence}%</dd>
           </div>
         ) : null}

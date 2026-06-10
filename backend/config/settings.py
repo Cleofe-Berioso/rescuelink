@@ -211,17 +211,19 @@ OPENROUTER_SAFETY_MODEL = os.environ.get("OPENROUTER_SAFETY_MODEL", "nvidia/nemo
 OPENROUTER_SITE_URL = os.environ.get("OPENROUTER_SITE_URL", "http://localhost:5173")
 OPENROUTER_APP_NAME = os.environ.get("OPENROUTER_APP_NAME", "RescueLink")
 
-# OpenAI
+# OpenAI (incident priority classification — OpenAI only)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
-AI_PROVIDER = os.environ.get("AI_PROVIDER", "openai")
-
 AI_PRIORITY_ENABLED = _env_bool("AI_PRIORITY_ENABLED", "True")
-AI_ABUSE_DETECTION_ENABLED = _env_bool("AI_ABUSE_DETECTION_ENABLED", "True")
 AI_PRIORITY_IMAGE_ANALYSIS = _env_bool("AI_PRIORITY_IMAGE_ANALYSIS", "False")
 AI_PRIORITY_FALLBACK_RULES = _env_bool("AI_PRIORITY_FALLBACK_RULES", "True")
 AI_PRIORITY_AUTO_DISPATCH = _env_bool("AI_PRIORITY_AUTO_DISPATCH", "False")
+AI_GUARDRAILS_ENABLED = _env_bool("AI_GUARDRAILS_ENABLED", "True")
+AI_CONFIDENCE_MINIMUM = float(os.environ.get("AI_CONFIDENCE_MINIMUM", "0.60"))
 AI_PRIORITY_TIMEOUT_SECONDS = int(os.environ.get("AI_PRIORITY_TIMEOUT_SECONDS", "10"))
+
+# Abuse detection may still use OpenRouter when configured (separate from priority AI)
+AI_ABUSE_DETECTION_ENABLED = _env_bool("AI_ABUSE_DETECTION_ENABLED", "True")
 AI_REVIEW_THRESHOLD = int(os.environ.get("AI_REVIEW_THRESHOLD", "70"))
 
 AI_AUTO_SUSPEND_THRESHOLD = int(os.environ.get("AI_AUTO_SUSPEND_THRESHOLD", "90"))
