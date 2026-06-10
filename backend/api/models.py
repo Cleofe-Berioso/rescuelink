@@ -101,6 +101,11 @@ class EmergencyReport(models.Model):
 		choices=AI_STATUS_CHOICES,
 		default=AI_STATUS_NOT_ANALYZED,
 	)
+	ai_priority = models.CharField(max_length=20, blank=True, default="")
+	ai_criticality = models.CharField(max_length=20, blank=True, default="")
+	ai_incident_category = models.CharField(max_length=50, blank=True, default="")
+	ai_reason = models.TextField(blank=True, default="")
+	ai_source = models.CharField(max_length=50, blank=True, default="")
 	priority_score = models.IntegerField(null=True, blank=True)
 	risk_score = models.IntegerField(null=True, blank=True)
 	risk_level = models.CharField(

@@ -152,6 +152,76 @@ class AiPriorityTests(APITestCase):
 		self.assertTrue(result["is_priority"])
 		self.assertEqual(result["critical_level"], EmergencyReport.LEVEL_CRITICAL)
 
+	@override_settings(
+		AI_PRIORITY_ENABLED=True,
+		AI_PROVIDER="openai",
+		OPENAI_API_KEY="test-openai-key",
+		OPENAI_MODEL="gpt-4.1-mini",
+	)
+	@patch("api.services.ai_priority._call_openai")
+	def test_openai_priority_classification_success(self, mock_call_openai):
+		mock_call_openai.return_value = {
+			"priority": "HIGH",
+			"criticality": "URGENT",
+			"incident_category": "ACCIDENT",
+			"confidence": 0.85,
+			"reason": "Road accident with injuries detected.",
+			"recommended_units": ["DRRM", "POLICE"]
+		}
+
+		report = EmergencyReport.objects.create(
+			reporter=self.citizen,
+			emergency_description="Car crash on main road, driver is bleeding",
+			latitude="10.7999000",
+			longitude="122.9740000",
+			contact_number="09171234567",
+		)
+		from api.services.ai_priority import apply_ai_priority_to_report
+		apply_ai_priority_to_report(report)
+		report.refresh_from_db()
+
+		self.assertEqual(report.ai_priority, "HIGH")
+		self.assertEqual(report.ai_criticality, "URGENT")
+		self.assertEqual(report.ai_incident_category, "ACCIDENT")
+		self.assertEqual(report.ai_confidence, 85)
+		self.assertEqual(report.ai_reason, "Road accident with injuries detected.")
+		self.assertEqual(report.ai_source, "OPENAI")
+		self.assertIn("DRRM", report.suggested_units)
+		self.assertIn("POLICE", report.suggested_units)
+
+		# Legacy compatibility checks
+		self.assertTrue(report.is_priority)
+		self.assertEqual(report.priority_level, "HIGH")
+		self.assertEqual(report.critical_level, "HIGH")
+		self.assertEqual(report.ai_priority_reason, "Road accident with injuries detected.")
+
+	@override_settings(
+		AI_PRIORITY_ENABLED=True,
+		AI_PROVIDER="openai",
+		OPENAI_API_KEY="test-openai-key",
+	)
+	@patch("api.services.ai_priority._call_openai")
+	def test_openai_priority_classification_failure_fallback(self, mock_call_openai):
+		mock_call_openai.return_value = None  # Mock failure
+
+		report = EmergencyReport.objects.create(
+			reporter=self.citizen,
+			emergency_description="unconscious citizen trapped under rubbles after earthquake",
+			latitude="10.7999000",
+			longitude="122.9740000",
+			contact_number="09171234567",
+		)
+		from api.services.ai_priority import apply_ai_priority_to_report
+		apply_ai_priority_to_report(report)
+		report.refresh_from_db()
+
+		# Fallback should classify this as CRITICAL and LIFE_THREATENING
+		self.assertEqual(report.ai_priority, "CRITICAL")
+		self.assertEqual(report.ai_criticality, "LIFE_THREATENING")
+		self.assertEqual(report.ai_source, "RULE_BASED_FALLBACK")
+		self.assertEqual(report.ai_analysis_status, EmergencyReport.AI_STATUS_FALLBACK)
+		self.assertTrue(report.is_priority)
+
 	def test_frontend_does_not_contain_openrouter_key(self):
 		repo_root = Path(__file__).resolve().parents[2]
 		scan_roots = [

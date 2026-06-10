@@ -70,17 +70,21 @@ function AiAssessmentCard({ report }) {
       <h3 className="report-detail-section__title">System review</h3>
       <dl className="report-detail-ai__grid">
         <div>
-          <dt>Priority Level</dt>
-          <dd>{formatPriorityLevel(report.priority_level)}</dd>
+          <dt>AI Priority</dt>
+          <dd>{formatPriorityLevel(report.ai_priority || report.priority_level)}</dd>
         </div>
         <div>
-          <dt>Critical Level</dt>
-          <dd>{formatPriorityLevel(report.critical_level)}</dd>
+          <dt>AI Criticality</dt>
+          <dd>{report.ai_criticality ? report.ai_criticality.replace(/_/g, " ") : formatPriorityLevel(report.critical_level)}</dd>
         </div>
-        {report.detected_incident_type ? (
+        <div>
+          <dt>AI Category</dt>
+          <dd>{(report.ai_incident_category || report.detected_incident_type || "—").toUpperCase()}</dd>
+        </div>
+        {report.ai_source ? (
           <div>
-            <dt>Detected Type</dt>
-            <dd>{report.detected_incident_type}</dd>
+            <dt>AI Source</dt>
+            <dd>{report.ai_source.replace(/_/g, " ")}</dd>
           </div>
         ) : null}
         {suggestedUnits.length ? (
@@ -89,10 +93,10 @@ function AiAssessmentCard({ report }) {
             <dd>{suggestedUnits.join(", ")}</dd>
           </div>
         ) : null}
-        {report.ai_priority_reason ? (
+        {(report.ai_reason || report.ai_priority_reason) ? (
           <div className="report-detail-ai__wide">
-            <dt>Reason</dt>
-            <dd>{report.ai_priority_reason}</dd>
+            <dt>AI Reason</dt>
+            <dd>{report.ai_reason || report.ai_priority_reason}</dd>
           </div>
         ) : null}
         {typeof report.priority_score === "number" ? (
@@ -103,7 +107,7 @@ function AiAssessmentCard({ report }) {
         ) : null}
         {typeof report.ai_confidence === "number" ? (
           <div>
-            <dt>Review score</dt>
+            <dt>Confidence</dt>
             <dd>{report.ai_confidence}%</dd>
           </div>
         ) : null}
