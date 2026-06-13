@@ -10,7 +10,15 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CitizenProfile, EmergencyCategory, EmergencyReport, IncidentResponse, IncidentStatusHistory, OTPRecord
+from .models import (
+	CitizenProfile,
+	EmergencyCategory,
+	EmergencyReport,
+	IncidentResponse,
+	IncidentStatusHistory,
+	OTPRecord,
+	ReportRiskLog,
+)
 from .storage import ALLOWED_EMERGENCY_PHOTO_CONTENT_TYPES
 
 UserModel = get_user_model()
@@ -96,17 +104,50 @@ class CitizenIncidentResponseSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ReportRiskLogSerializer(serializers.ModelSerializer):
+	changed_by = UserSerializer(read_only=True)
+
+	class Meta:
+		model = ReportRiskLog
+		fields = [
+			"id",
+			"old_risk_level",
+			"new_risk_level",
+			"changed_by",
+			"changed_by_role",
+			"reason",
+			"created_at",
+		]
+		read_only_fields = fields
+
+
+class SetRiskLevelSerializer(serializers.Serializer):
+	risk_level = serializers.ChoiceField(
+		choices=[
+			EmergencyReport.LEVEL_LOW,
+			EmergencyReport.LEVEL_MEDIUM,
+			EmergencyReport.LEVEL_HIGH,
+			EmergencyReport.LEVEL_CRITICAL,
+		]
+	)
+	reason = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
+
 class EmergencyReportSerializer(serializers.ModelSerializer):
     reporter = UserSerializer(read_only=True)
     image_url = serializers.SerializerMethodField()
     image = serializers.ImageField(write_only=True, required=False, allow_null=True)
     responses = CitizenIncidentResponseSerializer(many=True, read_only=True)
     citizen_notice = serializers.SerializerMethodField()
+    risk_logs = serializers.SerializerMethodField()
 
     STAFF_ONLY_FIELDS = (
         "priority_score",
         "risk_score",
         "risk_level",
+        "risk_source",
+        "risk_reason",
+        "risk_logs",
         "is_flagged",
         "flag_reason",
         "flag_type",
@@ -156,6 +197,9 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "ai_source",
             "risk_score",
             "risk_level",
+            "risk_source",
+            "risk_reason",
+            "risk_logs",
             "is_flagged",
             "flag_reason",
             "flag_type",
@@ -189,6 +233,9 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "ai_source",
             "risk_score",
             "risk_level",
+            "risk_source",
+            "risk_reason",
+            "risk_logs",
             "is_flagged",
             "flag_reason",
             "flag_type",
@@ -203,6 +250,12 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return request.user.is_staff
+
+    def get_risk_logs(self, obj):
+        if not self._request_user_is_staff():
+            return []
+        logs = obj.risk_logs.select_related("changed_by").all()[:20]
+        return ReportRiskLogSerializer(logs, many=True).data
 
     def get_citizen_notice(self, obj):
         if self._request_user_is_staff():

@@ -260,7 +260,6 @@ def apply_report_abuse_result(report: EmergencyReport, result: dict[str, Any]) -
 	score = result.get("risk_score", 0)
 
 	report.risk_score = score
-	report.risk_level = result.get("risk_level", RISK_LOW)
 	report.ai_review_result = {
 		"spam": result.get("ai_result", {}),
 		"rule_hits": result.get("rule_evidence", {}).get("rule_hits", []),
@@ -269,7 +268,6 @@ def apply_report_abuse_result(report: EmergencyReport, result: dict[str, Any]) -
 
 	update_fields = [
 		"risk_score",
-		"risk_level",
 		"ai_review_result",
 		"updated_at",
 	]

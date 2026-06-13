@@ -1203,6 +1203,48 @@
   padding: 3px 8px;
 }
 
+.compact-report-card__manual-tag,
+.report-detail-panel__manual-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1d4ed8;
+}
+
+.report-detail-risk {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.report-detail-risk__logs,
+.report-detail-risk__form {
+  margin-top: 1rem;
+}
+
+.report-detail-risk__logs-title {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.risk-level-form {
+  display: grid;
+  gap: 12px;
+}
+
 .report-detail-abuse {
   margin-top: 1rem;
   padding: 1rem;

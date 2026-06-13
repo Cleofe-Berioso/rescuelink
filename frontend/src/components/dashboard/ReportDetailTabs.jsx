@@ -1,6 +1,5 @@
-import ReportPriorityBadge from "./ReportPriorityBadge";
 import ReportFlagBadge, { hasReportFlag } from "./ReportFlagBadge";
-import { hasAiAnalysis } from "../../utils/reportPriority";
+import { formatPriorityLevel } from "../../utils/reportPriority";
 
 const TABS = [
   { key: "details", label: "Details" },
@@ -30,19 +29,20 @@ export default function ReportDetailTabs({ activeTab, onChange, responseCount, u
 }
 
 export function ReportDetailHeaderBadges({ report }) {
-  const critical = (report.critical_level || "LOW").toUpperCase();
+  const riskLevel = (report.risk_level || report.priority_level || "LOW").toUpperCase();
 
   return (
     <div className="report-detail-panel__badges">
-      {hasAiAnalysis(report) && critical !== "LOW" ? (
-        <span className={`report-detail-panel__critical-tag report-detail-panel__critical-tag--${critical.toLowerCase()}`}>
-          {critical}
+      {riskLevel !== "LOW" ? (
+        <span className={`report-detail-panel__critical-tag report-detail-panel__critical-tag--${riskLevel.toLowerCase()}`}>
+          {formatPriorityLevel(riskLevel)}
         </span>
       ) : null}
       {report.is_priority ? (
         <span className="report-detail-panel__priority-tag">Priority</span>
-      ) : report.priority_level ? (
-        <ReportPriorityBadge level={report.priority_level} />
+      ) : null}
+      {report.risk_source === "MANUAL_RESPONDER" ? (
+        <span className="report-detail-panel__manual-tag">Manually reviewed</span>
       ) : null}
       {hasReportFlag(report) ? <ReportFlagBadge report={report} /> : null}
     </div>

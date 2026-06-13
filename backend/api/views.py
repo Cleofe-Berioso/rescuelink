@@ -35,8 +35,8 @@ from .serializers import (
 )
 from .storage import delete_emergency_photo, download_emergency_photo, upload_emergency_photo
 from .request_utils import get_client_ip
-from .services.ai_priority import apply_ai_priority_to_report
 from .services.abuse_detection import is_profile_suspended, process_report_abuse
+from .services.triage_rules import apply_initial_triage, apply_manual_risk_override
 from .services.abuse_rules import compute_image_content_hash
 from .report_status import (
     can_accept_respond,
@@ -53,6 +53,7 @@ from .throttling import (
 
 UserModel = get_user_model()
 security_logger = logging.getLogger("rescuelink.security")
+logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
@@ -76,25 +77,25 @@ class RescueLinkTokenObtainPairView(TokenObtainPairView):
 
 
 class EmergencyReportViewSet(viewsets.ModelViewSet):
-	queryset = EmergencyReport.objects.select_related("reporter").prefetch_related("responses").all()
+	queryset = EmergencyReport.objects.select_related("reporter").prefetch_related("responses", "risk_logs").all()
 	serializer_class = EmergencyReportSerializer
 	http_method_names = ["get", "post", "head", "options"]
 
 	def get_permissions(self):
-		if self.action in ["respond", "update_status"]:
+		if self.action in ["respond", "update_status", "set_risk_level"]:
 			return [permissions.IsAuthenticated(), IsStaffUser()]
 		return [permissions.IsAuthenticated()]
 
 	def get_throttles(self):
 		if self.action == "create":
 			return [ReportCreateRateThrottle()]
-		if self.action in ("respond", "update_status"):
+		if self.action in ("respond", "update_status", "set_risk_level"):
 			return [StaffActionRateThrottle()]
 		return super().get_throttles()
 
 	def get_queryset(self):
 		user = self.request.user
-		queryset = EmergencyReport.objects.select_related("reporter").prefetch_related("responses").all()
+		queryset = EmergencyReport.objects.select_related("reporter").prefetch_related("responses", "risk_logs").all()
 		if user.is_staff:
 			status_filter = validate_report_status_filter(
 				self.request.query_params.get("status")
@@ -167,9 +168,9 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 			profile.save(update_fields=["last_activity_ip", "updated_at"])
 
 		try:
-			apply_ai_priority_to_report(report)
+			apply_initial_triage(report)
 		except Exception:
-			pass
+			logger.exception("Initial triage failed for report %s", report.pk)
 
 		try:
 			process_report_abuse(report, client_ip=client_ip, image_hash=image_hash)
@@ -289,6 +290,37 @@ class EmergencyReportViewSet(viewsets.ModelViewSet):
 		)
 
 		return Response({"id": report.id, "status": report.status, "previous_status": previous_status})
+
+	@action(detail=True, methods=["POST"], url_path="set_risk_level")
+	def set_risk_level(self, request, pk=None):
+		report = self.get_object()
+		risk_level = request.data.get("risk_level")
+		reason = str(request.data.get("reason", ""))[:2000]
+
+		if not risk_level:
+			return Response({"detail": "risk_level is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+		previous_status = report.status
+		try:
+			log_entry = apply_manual_risk_override(
+				report,
+				request.user,
+				str(risk_level),
+				reason,
+			)
+		except ValueError as exc:
+			return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+		report.refresh_from_db()
+		serializer = self.get_serializer(report)
+		return Response(
+			{
+				**serializer.data,
+				"risk_log_id": log_entry.id,
+				"status_unchanged": report.status == previous_status,
+			},
+			status=status.HTTP_200_OK,
+		)
 
 
 class IncidentStatusHistoryViewSet(viewsets.ReadOnlyModelViewSet):

@@ -110,9 +110,11 @@ class EmergencyReport(models.Model):
 	risk_score = models.IntegerField(null=True, blank=True)
 	risk_level = models.CharField(
 		max_length=10,
-		choices=RISK_LEVEL_CHOICES,
-		default=RISK_LOW,
+		choices=LEVEL_CHOICES,
+		default=LEVEL_LOW,
 	)
+	risk_source = models.CharField(max_length=30, blank=True, default="")
+	risk_reason = models.TextField(blank=True, default="")
 	is_flagged = models.BooleanField(default=False)
 	flag_reason = models.TextField(blank=True, default="")
 	flag_type = models.CharField(
@@ -182,6 +184,32 @@ class IncidentStatusHistory(models.Model):
 
 	class Meta:
 		ordering = ["-created_at"]
+
+
+class ReportRiskLog(models.Model):
+	report = models.ForeignKey(
+		EmergencyReport,
+		on_delete=models.CASCADE,
+		related_name="risk_logs",
+	)
+	old_risk_level = models.CharField(max_length=10)
+	new_risk_level = models.CharField(max_length=10)
+	changed_by = models.ForeignKey(
+		User,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name="risk_level_changes",
+	)
+	changed_by_role = models.CharField(max_length=20, blank=True, default="")
+	reason = models.TextField(blank=True, default="")
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["-created_at"]
+
+	def __str__(self):
+		return f"Report #{self.report_id} {self.old_risk_level}→{self.new_risk_level}"
 
 
 class Notification(models.Model):

@@ -174,6 +174,23 @@ export async function respondToReport(accessToken, reportId, response_unit, resp
   return res.json();
 }
 
+export async function setReportRiskLevel(accessToken, reportId, riskLevel, reason = "") {
+  const res = await fetch(`${API_BASE_URL}/reports/${reportId}/set_risk_level/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ risk_level: riskLevel, reason }),
+  });
+
+  if (!res.ok) {
+    await parseErrorResponse(res, "Failed to update risk level.");
+  }
+
+  return res.json();
+}
+
 export async function updateReportStatus(
   accessToken,
   reportId,

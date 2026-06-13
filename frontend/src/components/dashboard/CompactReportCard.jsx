@@ -46,7 +46,7 @@ export default function CompactReportCard({
 }) {
   const showAi = hasAiAnalysis(report);
   const criticalLevel = (report.critical_level || "LOW").toUpperCase();
-  const priorityLevel = report.ai_priority || report.priority_level;
+  const riskLevel = (report.risk_level || report.priority_level || "LOW").toUpperCase();
   const title = getReportTitle(report);
   const location = getReportLocation(report);
 
@@ -66,8 +66,14 @@ export default function CompactReportCard({
                 {formatPriorityLevel(report.critical_level)}
               </span>
             ) : null}
-            {(report.is_priority || report.ai_priority) && priorityLevel ? (
-              <ReportPriorityBadge level={priorityLevel} isPriority compact />
+            {riskLevel !== "LOW" ? (
+              <span className={`report-priority-badge report-priority-badge--${riskLevel.toLowerCase()} report-priority-badge--compact`}>
+                {formatPriorityLevel(riskLevel)}
+              </span>
+            ) : null}
+            {report.is_priority ? <ReportPriorityBadge level={riskLevel} isPriority compact /> : null}
+            {report.risk_source === "MANUAL_RESPONDER" ? (
+              <span className="compact-report-card__manual-tag">Manually reviewed</span>
             ) : null}
             {hasReportFlag(report) ? <ReportFlagBadge report={report} compact /> : null}
           </div>

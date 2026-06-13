@@ -74,10 +74,9 @@ class AiPriorityTests(APITestCase):
 		self.assertFalse(report.is_priority)
 		self.assertEqual(report.priority_level, "LOW")
 
-	@override_settings(AI_PRIORITY_ENABLED=True, OPENAI_API_KEY="test-key")
-	@patch("api.views.apply_ai_priority_to_report")
-	def test_ai_failure_does_not_block_report_creation(self, mock_apply):
-		mock_apply.side_effect = RuntimeError("AI service unavailable")
+	@patch("api.views.apply_initial_triage")
+	def test_triage_failure_does_not_block_report_creation(self, mock_apply):
+		mock_apply.side_effect = RuntimeError("Triage service unavailable")
 		self.client.force_authenticate(user=self.citizen)
 		res = self.client.post(
 			"/api/reports/",
@@ -92,8 +91,7 @@ class AiPriorityTests(APITestCase):
 		self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 		self.assertTrue(EmergencyReport.objects.filter(pk=res.data["id"]).exists())
 
-	@override_settings(AI_PRIORITY_ENABLED=True, OPENAI_API_KEY="")
-	def test_missing_openai_key_uses_rule_based_fallback(self):
+	def test_report_creation_uses_rule_based_triage_without_ai(self):
 		self.client.force_authenticate(user=self.citizen)
 		res = self.client.post(
 			"/api/reports/",
@@ -108,8 +106,8 @@ class AiPriorityTests(APITestCase):
 		self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 		report = EmergencyReport.objects.get(pk=res.data["id"])
 		self.assertTrue(report.is_priority)
-		self.assertEqual(report.ai_source, "RULE_BASED_FALLBACK")
-		self.assertIn(report.ai_analysis_status, ("fallback", "failed"))
+		self.assertEqual(report.risk_source, "RULE_BASED")
+		self.assertIn(report.risk_level, ("HIGH", "CRITICAL"))
 
 	def test_priority_filter_returns_ai_priority_reports(self):
 		EmergencyReport.objects.create(

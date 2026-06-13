@@ -5,13 +5,10 @@ import ReportStatusBadge from "./ReportStatusBadge";
 import UnitResponsesPanel from "./UnitResponses";
 import ReportDetailTabs, { ReportDetailHeaderBadges } from "./ReportDetailTabs";
 import ReportFlagBadge, { hasReportFlag } from "./ReportFlagBadge";
-import {
-  formatPriorityLevel,
-  getReportSuggestedUnits,
-  hasAiAnalysis,
-} from "../../utils/reportPriority";
+import { formatPriorityLevel } from "../../utils/reportPriority";
 import { formatRelativeTime, getReportLocation, getReportTitle } from "../../utils/reportListUtils";
 import IncidentLocationMap from "./IncidentLocationMap";
+import ChangeRiskLevelForm from "./ChangeRiskLevelForm";
 
 function formatReportDate(iso) {
   if (!iso) return "—";
@@ -43,12 +40,6 @@ function AbuseReviewCard({ report }) {
             <dd>{report.risk_score}</dd>
           </div>
         ) : null}
-        {report.risk_level ? (
-          <div>
-            <dt>Risk Level</dt>
-            <dd>{report.risk_level}</dd>
-          </div>
-        ) : null}
         {report.flag_reason ? (
           <div className="report-detail-ai__wide">
             <dt>System / Rule Reason</dt>
@@ -60,61 +51,67 @@ function AbuseReviewCard({ report }) {
   );
 }
 
-function AiAssessmentCard({ report }) {
-  if (!hasAiAnalysis(report)) return null;
+function formatRiskSource(source) {
+  if (!source) return "—";
+  if (source === "RULE_BASED") return "Rule-based triage";
+  if (source === "MANUAL_RESPONDER") return "Manual responder";
+  return source.replace(/_/g, " ");
+}
 
-  const suggestedUnits = getReportSuggestedUnits(report);
+function RiskTriageCard({ report, config, token, onChanged }) {
+  const riskLevel = report.risk_level || report.priority_level || "LOW";
+  const logs = Array.isArray(report.risk_logs) ? report.risk_logs : [];
 
   return (
-    <section className="report-detail-ai">
-      <h3 className="report-detail-section__title">System review</h3>
+    <section className="report-detail-risk">
+      <h3 className="report-detail-section__title">Risk level</h3>
+      <div className="report-detail-panel__badges">
+        <span className={`report-detail-panel__critical-tag report-detail-panel__critical-tag--${riskLevel.toLowerCase()}`}>
+          {formatPriorityLevel(riskLevel)}
+        </span>
+      </div>
       <dl className="report-detail-ai__grid">
         <div>
-          <dt>AI Priority</dt>
-          <dd>{formatPriorityLevel(report.ai_priority || report.priority_level)}</dd>
+          <dt>Source</dt>
+          <dd>{formatRiskSource(report.risk_source)}</dd>
         </div>
-        <div>
-          <dt>AI Criticality</dt>
-          <dd>{report.ai_criticality ? report.ai_criticality.replace(/_/g, " ") : formatPriorityLevel(report.critical_level)}</dd>
-        </div>
-        <div>
-          <dt>AI Incident Category</dt>
-          <dd>{(report.ai_incident_category || report.detected_incident_type || "—").replace(/_/g, " ")}</dd>
-        </div>
-        {report.ai_source ? (
-          <div>
-            <dt>AI Source</dt>
-            <dd>{report.ai_source.replace(/_/g, " ")}</dd>
-          </div>
-        ) : null}
-        {suggestedUnits.length ? (
+        {report.risk_reason ? (
           <div className="report-detail-ai__wide">
-            <dt>Suggested Units</dt>
-            <dd>{suggestedUnits.join(", ")}</dd>
-          </div>
-        ) : null}
-        {(report.ai_reason || report.ai_priority_reason) ? (
-          <div className="report-detail-ai__wide">
-            <dt>AI Reason</dt>
-            <dd>{report.ai_reason || report.ai_priority_reason}</dd>
-          </div>
-        ) : null}
-        {typeof report.priority_score === "number" ? (
-          <div>
-            <dt>Priority Score</dt>
-            <dd>{report.priority_score}</dd>
-          </div>
-        ) : null}
-        {typeof report.ai_confidence === "number" ? (
-          <div>
-            <dt>AI Confidence</dt>
-            <dd>{report.ai_confidence}%</dd>
+            <dt>Reason</dt>
+            <dd>{report.risk_reason}</dd>
           </div>
         ) : null}
       </dl>
-      <p className="report-detail-ai__note">
-        
-      </p>
+
+      {logs.length ? (
+        <div className="report-detail-risk__logs">
+          <h4 className="report-detail-risk__logs-title">Risk change history</h4>
+          <ul className="report-detail-updates">
+            {logs.map((entry) => (
+              <li key={entry.id} className="report-detail-updates__item">
+                <div className="report-detail-updates__meta">
+                  <strong>
+                    {entry.old_risk_level} → {entry.new_risk_level}
+                  </strong>
+                  <time>{formatReportDate(entry.created_at)}</time>
+                </div>
+                <p className="report-detail-updates__remarks">
+                  {entry.reason || "No reason recorded"}
+                  {entry.changed_by?.username ? ` · ${entry.changed_by.username}` : ""}
+                  {entry.changed_by_role ? ` (${entry.changed_by_role})` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {config.canRespond ? (
+        <div className="report-detail-risk__form">
+          <h4 className="report-detail-risk__logs-title">Change risk level</h4>
+          <ChangeRiskLevelForm token={token} report={report} onChanged={onChanged} />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -262,7 +259,7 @@ export default function ReportDetailsContent({
               />
             </section>
 
-            <AiAssessmentCard report={report} />
+            <RiskTriageCard report={report} config={config} token={token} onChanged={onChanged} />
             <AbuseReviewCard report={report} />
 
             {config.canRespond ? (
