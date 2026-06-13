@@ -140,6 +140,7 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
     responses = CitizenIncidentResponseSerializer(many=True, read_only=True)
     citizen_notice = serializers.SerializerMethodField()
     risk_logs = serializers.SerializerMethodField()
+    abuse_review_result = serializers.JSONField(source="ai_review_result", read_only=True)
 
     STAFF_ONLY_FIELDS = (
         "priority_score",
@@ -152,19 +153,8 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
         "flag_reason",
         "flag_type",
         "needs_verification",
-        "ai_review_result",
+        "abuse_review_result",
         "reviewed_at",
-        "ai_priority_reason",
-        "detected_incident_type",
-        "suggested_units",
-        "ai_confidence",
-        "ai_analyzed_at",
-        "ai_analysis_status",
-        "ai_priority",
-        "ai_criticality",
-        "ai_incident_category",
-        "ai_reason",
-        "ai_source",
     )
 
     class Meta:
@@ -184,17 +174,6 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "priority_level",
             "critical_level",
             "priority_score",
-            "ai_priority_reason",
-            "detected_incident_type",
-            "suggested_units",
-            "ai_confidence",
-            "ai_analyzed_at",
-            "ai_analysis_status",
-            "ai_priority",
-            "ai_criticality",
-            "ai_incident_category",
-            "ai_reason",
-            "ai_source",
             "risk_score",
             "risk_level",
             "risk_source",
@@ -204,7 +183,7 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "flag_reason",
             "flag_type",
             "needs_verification",
-            "ai_review_result",
+            "abuse_review_result",
             "reviewed_at",
             "citizen_notice",
             "created_at",
@@ -220,17 +199,6 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "priority_level",
             "critical_level",
             "priority_score",
-            "ai_priority_reason",
-            "detected_incident_type",
-            "suggested_units",
-            "ai_confidence",
-            "ai_analyzed_at",
-            "ai_analysis_status",
-            "ai_priority",
-            "ai_criticality",
-            "ai_incident_category",
-            "ai_reason",
-            "ai_source",
             "risk_score",
             "risk_level",
             "risk_source",
@@ -240,7 +208,7 @@ class EmergencyReportSerializer(serializers.ModelSerializer):
             "flag_reason",
             "flag_type",
             "needs_verification",
-            "ai_review_result",
+            "abuse_review_result",
             "reviewed_at",
             "citizen_notice",
         ]

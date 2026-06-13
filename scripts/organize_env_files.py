@@ -68,19 +68,13 @@ BACKEND_SECTIONS: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "OpenRouter AI",
+        "Rule-Based Triage / Manual Review",
         [
-            "OPENROUTER_API_KEY",
-            "OPENROUTER_MODEL",
-            "OPENROUTER_FALLBACK_MODEL",
-            "OPENROUTER_SAFETY_MODEL",
-            "OPENROUTER_SITE_URL",
-            "OPENROUTER_APP_NAME",
-            "AI_PRIORITY_ENABLED",
-            "AI_ABUSE_DETECTION_ENABLED",
-            "AI_PRIORITY_TIMEOUT_SECONDS",
-            "AI_REVIEW_THRESHOLD",
-            "AI_AUTO_SUSPEND_THRESHOLD",
+            "RULE_BASED_TRIAGE_ENABLED",
+            "DUPLICATE_REPORT_CHECK_ENABLED",
+            "MANUAL_ABUSE_REVIEW_ENABLED",
+            "ABUSE_REVIEW_THRESHOLD",
+            "ABUSE_AUTO_SUSPEND_THRESHOLD",
         ],
     ),
     (
@@ -171,8 +165,7 @@ def write_backend_env() -> tuple[list[str], list[str], list[str]]:
             "# - ALLOWED_HOSTS=<render-hostname-only>\n"
             "# - CORS_ALLOWED_ORIGINS=https://<vercel-frontend-domain>\n"
             "# - CSRF_TRUSTED_ORIGINS=https://<vercel-frontend-domain>\n"
-            "# - DATABASE_URL=<DATABASE_URL> OR keep DB_* vars\n"
-            "# - OPENROUTER_SITE_URL=https://<vercel-frontend-domain>"
+            "# - DATABASE_URL=<DATABASE_URL> OR keep DB_* vars"
         ),
     )
     path.write_text(content, encoding="utf-8")
@@ -245,7 +238,6 @@ def write_examples() -> None:
             "# ALLOWED_HOSTS=127.0.0.1,localhost\n"
             "# CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173\n"
             "# CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173\n"
-            "# OPENROUTER_SITE_URL=http://localhost:5173\n"
             "#\n"
             "# Production (Render) examples:\n"
             "# SECRET_KEY=<SECRET_KEY>\n"
@@ -275,16 +267,11 @@ def write_examples() -> None:
         "SUPABASE_STORAGE_BUCKET": "emergency-photos",
         "SUPABASE_S3_ACCESS_KEY_ID": "your-s3-access-key-id",
         "SUPABASE_S3_SECRET_ACCESS_KEY": "your-s3-secret-access-key",
-        "OPENROUTER_MODEL": "openai/gpt-oss-120b:free",
-        "OPENROUTER_FALLBACK_MODEL": "nvidia/nemotron-3-super:free",
-        "OPENROUTER_SAFETY_MODEL": "nvidia/nemotron-3.5-content-safety:free",
-        "OPENROUTER_SITE_URL": "http://localhost:5173",
-        "OPENROUTER_APP_NAME": "RescueLink",
-        "AI_PRIORITY_ENABLED": "true",
-        "AI_ABUSE_DETECTION_ENABLED": "true",
-        "AI_PRIORITY_TIMEOUT_SECONDS": "20",
-        "AI_REVIEW_THRESHOLD": "70",
-        "AI_AUTO_SUSPEND_THRESHOLD": "90",
+        "RULE_BASED_TRIAGE_ENABLED": "True",
+        "DUPLICATE_REPORT_CHECK_ENABLED": "True",
+        "MANUAL_ABUSE_REVIEW_ENABLED": "True",
+        "ABUSE_REVIEW_THRESHOLD": "70",
+        "ABUSE_AUTO_SUSPEND_THRESHOLD": "90",
         "MAX_EMERGENCY_PHOTO_BYTES": "5242880",
         "MAX_EMERGENCY_PHOTOS": "5",
         "JWT_ACCESS_TOKEN_HOURS": "1",

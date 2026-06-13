@@ -204,29 +204,12 @@ SUPABASE_S3_ACCESS_KEY_ID = os.environ.get("SUPABASE_S3_ACCESS_KEY_ID", "")
 SUPABASE_S3_SECRET_ACCESS_KEY = os.environ.get("SUPABASE_S3_SECRET_ACCESS_KEY", "")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "emergency-photos")
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
-OPENROUTER_FALLBACK_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL", "nvidia/nemotron-3-super:free")
-OPENROUTER_SAFETY_MODEL = os.environ.get("OPENROUTER_SAFETY_MODEL", "nvidia/nemotron-3.5-content-safety:free")
-OPENROUTER_SITE_URL = os.environ.get("OPENROUTER_SITE_URL", "http://localhost:5173")
-OPENROUTER_APP_NAME = os.environ.get("OPENROUTER_APP_NAME", "RescueLink")
-
-# OpenAI (incident priority classification — OpenAI only)
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
-AI_PRIORITY_ENABLED = _env_bool("AI_PRIORITY_ENABLED", "True")
-AI_PRIORITY_IMAGE_ANALYSIS = _env_bool("AI_PRIORITY_IMAGE_ANALYSIS", "False")
-AI_PRIORITY_FALLBACK_RULES = _env_bool("AI_PRIORITY_FALLBACK_RULES", "True")
-AI_PRIORITY_AUTO_DISPATCH = _env_bool("AI_PRIORITY_AUTO_DISPATCH", "False")
-AI_GUARDRAILS_ENABLED = _env_bool("AI_GUARDRAILS_ENABLED", "True")
-AI_CONFIDENCE_MINIMUM = float(os.environ.get("AI_CONFIDENCE_MINIMUM", "0.60"))
-AI_PRIORITY_TIMEOUT_SECONDS = int(os.environ.get("AI_PRIORITY_TIMEOUT_SECONDS", "10"))
-
-# Abuse detection may still use OpenRouter when configured (separate from priority AI)
-AI_ABUSE_DETECTION_ENABLED = _env_bool("AI_ABUSE_DETECTION_ENABLED", "True")
-AI_REVIEW_THRESHOLD = int(os.environ.get("AI_REVIEW_THRESHOLD", "70"))
-
-AI_AUTO_SUSPEND_THRESHOLD = int(os.environ.get("AI_AUTO_SUSPEND_THRESHOLD", "90"))
+# Rule-based triage and abuse review (no external AI APIs)
+RULE_BASED_TRIAGE_ENABLED = _env_bool("RULE_BASED_TRIAGE_ENABLED", "True")
+DUPLICATE_REPORT_CHECK_ENABLED = _env_bool("DUPLICATE_REPORT_CHECK_ENABLED", "True")
+MANUAL_ABUSE_REVIEW_ENABLED = _env_bool("MANUAL_ABUSE_REVIEW_ENABLED", "True")
+ABUSE_REVIEW_THRESHOLD = int(os.environ.get("ABUSE_REVIEW_THRESHOLD", "70"))
+ABUSE_AUTO_SUSPEND_THRESHOLD = int(os.environ.get("ABUSE_AUTO_SUSPEND_THRESHOLD", "90"))
 
 DJANGO_ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/").strip("/") + "/"
 

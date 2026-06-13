@@ -67,16 +67,39 @@ class RiskLevelTests(APITestCase):
 	def test_initial_rule_based_triage_medium(self):
 		result = classify_initial_risk(
 			EmergencyReport(
-				emergency_description="minor injury needs assistance",
+				emergency_description="lost pet minor issue assistance needed",
 				latitude="10.7999000",
 				longitude="122.9740000",
 				contact_number="09170000001",
 				reporter=self.citizen,
 			)
 		)
-		self.assertIn(result["risk_level"], ("MEDIUM", "HIGH"))
+		self.assertEqual(result["risk_level"], "MEDIUM")
 
-	@override_settings(AI_PRIORITY_ENABLED=False)
+	def test_initial_rule_based_triage_high(self):
+		result = classify_initial_risk(
+			EmergencyReport(
+				emergency_description="urgent rescue needed person stranded",
+				latitude="10.7999000",
+				longitude="122.9740000",
+				contact_number="09170000001",
+				reporter=self.citizen,
+			)
+		)
+		self.assertEqual(result["risk_level"], "HIGH")
+
+	def test_initial_rule_based_triage_low(self):
+		result = classify_initial_risk(
+			EmergencyReport(
+				emergency_description="general report unclear description",
+				latitude="10.7999000",
+				longitude="122.9740000",
+				contact_number="09170000001",
+				reporter=self.citizen,
+			)
+		)
+		self.assertEqual(result["risk_level"], "LOW")
+
 	def test_report_creation_assigns_rule_based_risk(self):
 		self.client.force_authenticate(user=self.citizen)
 		res = self.client.post(

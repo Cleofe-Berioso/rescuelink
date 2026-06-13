@@ -1,4 +1,4 @@
-"""AI-assisted abuse detection and safe auto-actions for RescueLink."""
+"""Rule-based abuse and spam detection for RescueLink."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from django.conf import settings
 from django.utils import timezone
 
 from api.models import CitizenProfile, EmergencyReport
-from api.openrouter_client import chat_json
 from api.services.abuse_rules import (
 	RISK_EXTREME,
 	RISK_HIGH,
@@ -21,32 +20,6 @@ from api.services.abuse_rules import (
 )
 
 logger = logging.getLogger(__name__)
-
-ACCOUNT_SYSTEM_PROMPT = """You are a fraud-risk assistant for RescueLink citizen accounts.
-You receive metadata only. Never request passwords, tokens, or secrets.
-Return JSON only:
-{
-  "risk_level": "low | medium | high | extreme",
-  "risk_score": 0,
-  "is_possible_duplicate": false,
-  "is_possible_dummy_account": false,
-  "recommended_action": "allow | flag_for_review | needs_verification | temporary_suspend_for_review",
-  "reason": "short explanation"
-}
-Score 0-100. Be conservative; false positives harm real emergencies."""
-
-REPORT_SPAM_SYSTEM_PROMPT = """You are a spam-risk assistant for RescueLink emergency reports.
-You receive metadata only. Never delete reports. Never permanently ban users.
-Return JSON only:
-{
-  "risk_level": "low | medium | high | extreme",
-  "risk_score": 0,
-  "is_possible_spam": false,
-  "is_possible_duplicate_report": false,
-  "recommended_action": "allow | flag_for_review | needs_verification | temporary_suspend_for_review",
-  "reason": "short explanation"
-}
-Score 0-100. Real emergencies must not be blocked."""
 
 RISK_LEVEL_MAP = {
 	"low": RISK_LOW,
@@ -71,58 +44,14 @@ def _normalize_score(value: Any, default: int = 0) -> int:
 	return max(0, min(100, score))
 
 
-def _combine_scores(rule_score: int, ai_score: int) -> int:
-	if ai_score <= 0:
-		return rule_score
-	return min(100, max(rule_score, int(rule_score * 0.55 + ai_score * 0.45)))
-
-
-def _resolve_action(combined_score: int, recommended_action: str, strong_evidence: bool) -> str:
-	action = (recommended_action or "allow").strip().lower()
-	if combined_score >= getattr(settings, "AI_AUTO_SUSPEND_THRESHOLD", 90):
+def _resolve_action(rule_score: int, strong_evidence: bool) -> str:
+	if rule_score >= getattr(settings, "ABUSE_AUTO_SUSPEND_THRESHOLD", 90):
 		if strong_evidence:
 			return "temporary_suspend_for_review"
 		return "needs_verification"
-	if combined_score >= getattr(settings, "AI_REVIEW_THRESHOLD", 70):
-		if action in {"flag_for_review", "needs_verification", "temporary_suspend_for_review"}:
-			return action
+	if rule_score >= getattr(settings, "ABUSE_REVIEW_THRESHOLD", 70):
 		return "needs_verification"
 	return "allow"
-
-
-def _account_ai_metadata(profile: CitizenProfile, rule_evidence: dict[str, Any]) -> dict[str, Any]:
-	user = profile.user
-	return {
-		"username_length": len(user.username or ""),
-		"account_age_hours": round((timezone.now() - profile.created_at).total_seconds() / 3600, 1),
-		"is_verified": profile.is_verified,
-		"has_home_address": bool(profile.home_address.strip()),
-		"rule_hits": rule_evidence.get("rule_hits", []),
-		"rule_score": rule_evidence.get("rule_score", 0),
-	}
-
-
-def _report_ai_metadata(report: EmergencyReport, rule_evidence: dict[str, Any]) -> dict[str, Any]:
-	return {
-		"description_length": len(report.emergency_description or ""),
-		"has_address_text": bool(report.address_text),
-		"has_image": bool(report.image),
-		"rule_hits": rule_evidence.get("rule_hits", []),
-		"rule_score": rule_evidence.get("rule_score", 0),
-	}
-
-
-def _call_abuse_ai(system_prompt: str, metadata: dict[str, Any]) -> dict[str, Any] | None:
-	if not getattr(settings, "AI_ABUSE_DETECTION_ENABLED", True):
-		return None
-	if not getattr(settings, "OPENROUTER_API_KEY", ""):
-		return None
-
-	messages = [
-		{"role": "system", "content": system_prompt},
-		{"role": "user", "content": f"Analyze this safe metadata JSON:\n{metadata}"},
-	]
-	return chat_json(messages)
 
 
 def analyze_account_abuse(
@@ -131,35 +60,22 @@ def analyze_account_abuse(
 	client_ip: str = "",
 ) -> dict[str, Any]:
 	rule_evidence = gather_account_rule_evidence(profile, client_ip=client_ip)
-	ai_data = None
-	try:
-		ai_data = _call_abuse_ai(ACCOUNT_SYSTEM_PROMPT, _account_ai_metadata(profile, rule_evidence))
-	except Exception:
-		logger.exception("Account abuse AI call failed for profile %s", profile.pk)
-
-	ai_score = _normalize_score(ai_data.get("risk_score") if ai_data else 0)
-	combined_score = _combine_scores(rule_evidence["rule_score"], ai_score)
-	risk_level = _normalize_risk_level(ai_data.get("risk_level") if ai_data else rule_evidence["risk_level"])
-	recommended = _resolve_action(
-		combined_score,
-		str(ai_data.get("recommended_action") if ai_data else "allow"),
-		rule_evidence["strong_evidence"],
-	)
+	rule_score = _normalize_score(rule_evidence["rule_score"])
+	recommended = _resolve_action(rule_score, rule_evidence["strong_evidence"])
 
 	result = {
-		"risk_level": risk_level,
-		"risk_score": combined_score,
-		"is_possible_duplicate": bool(ai_data.get("is_possible_duplicate")) if ai_data else "duplicate" in " ".join(rule_evidence["rule_hits"]),
-		"is_possible_dummy_account": bool(ai_data.get("is_possible_dummy_account")) if ai_data else False,
+		"risk_level": _normalize_risk_level(rule_evidence["risk_level"]),
+		"risk_score": rule_score,
+		"is_possible_duplicate": "duplicate" in " ".join(rule_evidence["rule_hits"]),
+		"is_possible_dummy_account": "dummy" in " ".join(rule_evidence["rule_hits"]),
 		"recommended_action": recommended,
-		"reason": str((ai_data or {}).get("reason") or _rule_reason(rule_evidence["rule_hits"]))[:2000],
+		"reason": _rule_reason(rule_evidence["rule_hits"]),
 		"rule_evidence": rule_evidence,
-		"ai_result": ai_data or {},
 	}
 	logger.info(
 		"Account abuse analysis profile=%s score=%s action=%s hits=%s",
 		profile.pk,
-		combined_score,
+		rule_score,
 		recommended,
 		rule_evidence.get("rule_hits"),
 	)
@@ -177,40 +93,32 @@ def analyze_report_spam(
 		client_ip=client_ip,
 		image_hash=image_hash,
 	)
-	ai_data = None
-	try:
-		ai_data = _call_abuse_ai(REPORT_SPAM_SYSTEM_PROMPT, _report_ai_metadata(report, rule_evidence))
-	except Exception:
-		logger.exception("Report spam AI call failed for report %s", report.pk)
+	rule_score = _normalize_score(rule_evidence["rule_score"])
+	recommended = _resolve_action(rule_score, rule_evidence["strong_evidence"])
+	hits = rule_evidence["rule_hits"]
 
-	ai_score = _normalize_score(ai_data.get("risk_score") if ai_data else 0)
-	combined_score = _combine_scores(rule_evidence["rule_score"], ai_score)
-	risk_level = _normalize_risk_level(ai_data.get("risk_level") if ai_data else rule_evidence["risk_level"])
-	recommended = _resolve_action(
-		combined_score,
-		str(ai_data.get("recommended_action") if ai_data else "allow"),
-		rule_evidence["strong_evidence"],
+	is_spam = rule_score >= getattr(settings, "ABUSE_REVIEW_THRESHOLD", 70)
+	is_dup_report = (
+		"reused_image_hash" in hits
+		or "similar_description" in hits
+		or "nearby_duplicate_location" in hits
 	)
 
-	is_spam = bool(ai_data.get("is_possible_spam")) if ai_data else combined_score >= 70
-	is_dup_report = bool(ai_data.get("is_possible_duplicate_report")) if ai_data else "similar_description" in rule_evidence["rule_hits"] or "nearby_duplicate_location" in rule_evidence["rule_hits"]
-
 	result = {
-		"risk_level": risk_level,
-		"risk_score": combined_score,
+		"risk_level": _normalize_risk_level(rule_evidence["risk_level"]),
+		"risk_score": rule_score,
 		"is_possible_spam": is_spam,
 		"is_possible_duplicate_report": is_dup_report,
 		"recommended_action": recommended,
-		"reason": str((ai_data or {}).get("reason") or _rule_reason(rule_evidence["rule_hits"]))[:2000],
+		"reason": _rule_reason(hits),
 		"rule_evidence": rule_evidence,
-		"ai_result": ai_data or {},
 	}
 	logger.info(
 		"Report spam analysis report=%s score=%s action=%s hits=%s",
 		report.pk,
-		combined_score,
+		rule_score,
 		recommended,
-		rule_evidence.get("rule_hits"),
+		hits,
 	)
 	return result
 
@@ -256,14 +164,14 @@ def apply_account_abuse_result(profile: CitizenProfile, result: dict[str, Any]) 
 
 def apply_report_abuse_result(report: EmergencyReport, result: dict[str, Any]) -> None:
 	action = result.get("recommended_action", "allow")
-	review_threshold = getattr(settings, "AI_REVIEW_THRESHOLD", 70)
+	review_threshold = getattr(settings, "ABUSE_REVIEW_THRESHOLD", 70)
 	score = result.get("risk_score", 0)
 
 	report.risk_score = score
 	report.ai_review_result = {
-		"spam": result.get("ai_result", {}),
 		"rule_hits": result.get("rule_evidence", {}).get("rule_hits", []),
 		"recommended_action": action,
+		"source": "RULE_BASED",
 	}
 
 	update_fields = [
@@ -311,6 +219,8 @@ def is_profile_suspended(profile: CitizenProfile) -> bool:
 
 
 def process_registration_abuse(profile: CitizenProfile, *, client_ip: str = "") -> None:
+	if not getattr(settings, "MANUAL_ABUSE_REVIEW_ENABLED", True):
+		return
 	if client_ip:
 		profile.registration_ip = client_ip
 		profile.last_activity_ip = client_ip
@@ -328,6 +238,12 @@ def process_report_abuse(
 	client_ip: str = "",
 	image_hash: str = "",
 ) -> dict[str, Any]:
+	if not getattr(settings, "MANUAL_ABUSE_REVIEW_ENABLED", True):
+		return {}
+
+	if not getattr(settings, "DUPLICATE_REPORT_CHECK_ENABLED", True):
+		image_hash = ""
+
 	profile = getattr(report.reporter, "citizen_profile", None)
 	if profile and client_ip:
 		profile.last_activity_ip = client_ip

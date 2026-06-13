@@ -237,7 +237,7 @@ export default function ReportsListSection({
               report={report}
               token={token}
               unitResponses={unitResponses}
-              showAiPriority
+              showPriorityInfo
               actions={
                 config.canRespond ? (
                   <ReportActions

@@ -38,27 +38,15 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: OPENROUTER_MODEL
-        value: openai/gpt-oss-120b:free
-      - key: OPENROUTER_FALLBACK_MODEL
-        value: nvidia/nemotron-3-super:free
-      - key: OPENROUTER_SAFETY_MODEL
-        value: nvidia/nemotron-3.5-content-safety:free
-      - key: OPENROUTER_SITE_URL
-        sync: false
-      - key: OPENROUTER_APP_NAME
-        value: RescueLink
-      - key: AI_PRIORITY_ENABLED
-        value: "true"
-      - key: AI_ABUSE_DETECTION_ENABLED
-        value: "true"
-      - key: AI_PRIORITY_TIMEOUT_SECONDS
-        value: "20"
-      - key: AI_REVIEW_THRESHOLD
+      - key: RULE_BASED_TRIAGE_ENABLED
+        value: "True"
+      - key: DUPLICATE_REPORT_CHECK_ENABLED
+        value: "True"
+      - key: MANUAL_ABUSE_REVIEW_ENABLED
+        value: "True"
+      - key: ABUSE_REVIEW_THRESHOLD
         value: "70"
-      - key: AI_AUTO_SUSPEND_THRESHOLD
+      - key: ABUSE_AUTO_SUSPEND_THRESHOLD
         value: "90"
       - key: MAX_EMERGENCY_PHOTO_BYTES
         value: "5242880"

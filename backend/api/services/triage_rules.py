@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from api.models import EmergencyReport, ReportRiskLog
@@ -24,40 +25,40 @@ VALID_RISK_LEVELS = {
 
 CRITICAL_KEYWORDS = [
 	"fire",
-	"explosion",
+	"accident",
+	"injured",
+	"injury",
 	"trapped",
-	"unconscious",
+	"flood",
 	"drowning",
-	"severe bleeding",
-	"gunshot",
-	"stabbing",
-	"not breathing",
-	"cardiac arrest",
+	"unconscious",
+	"bleeding",
+	"violence",
+	"explosion",
+	"collapsed",
+	"emergency",
 	"sunog",
+	"baha",
 	"naipit",
 	"lubog",
-	"walang malay",
 ]
 
 HIGH_KEYWORDS = [
-	"accident",
-	"injury",
-	"flood",
-	"landslide",
-	"smoke",
-	"chest pain",
-	"vehicle crash",
-	"collapsed",
-	"rescue needed",
-	"baha",
-	"aksidente",
-	"bangga",
-	"injured",
+	"urgent",
 	"rescue",
+	"danger",
+	"stranded",
+	"missing",
+	"severe",
+	"smoke",
+	"landslide",
+	"chest pain",
 ]
 
 MEDIUM_KEYWORDS = [
-	"stranded",
+	"lost pet",
+	"found pet",
+	"minor issue",
 	"minor injury",
 	"assistance needed",
 	"lost",
@@ -87,7 +88,9 @@ def classify_initial_risk(report: EmergencyReport) -> dict[str, Any]:
 
 	risk_level = EmergencyReport.LEVEL_LOW
 
-	if critical_level == EmergencyReport.LEVEL_CRITICAL or _keyword_match(text, CRITICAL_KEYWORDS):
+	if _keyword_match(text, MEDIUM_KEYWORDS):
+		risk_level = EmergencyReport.LEVEL_MEDIUM
+	elif critical_level == EmergencyReport.LEVEL_CRITICAL or _keyword_match(text, CRITICAL_KEYWORDS):
 		risk_level = EmergencyReport.LEVEL_CRITICAL
 	elif (
 		critical_level == EmergencyReport.LEVEL_HIGH
@@ -98,7 +101,6 @@ def classify_initial_risk(report: EmergencyReport) -> dict[str, Any]:
 	elif (
 		critical_level == EmergencyReport.LEVEL_MEDIUM
 		or priority_level == EmergencyReport.LEVEL_MEDIUM
-		or _keyword_match(text, MEDIUM_KEYWORDS)
 	):
 		risk_level = EmergencyReport.LEVEL_MEDIUM
 
@@ -127,6 +129,9 @@ def _sync_legacy_priority_fields(report: EmergencyReport, risk_level: str) -> No
 
 
 def apply_initial_triage(report: EmergencyReport) -> None:
+	if not getattr(settings, "RULE_BASED_TRIAGE_ENABLED", True):
+		return
+
 	result = classify_initial_risk(report)
 	report.risk_source = result["risk_source"]
 	report.risk_reason = result["risk_reason"]

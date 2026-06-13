@@ -108,13 +108,23 @@ export function filterPriorityReports(reports, _role = null) {
   return reports.filter((report) => Boolean(report?.is_priority));
 }
 
-export function isAiPriorityReport(report) {
+export function isPriorityReport(report) {
   return Boolean(report?.is_priority);
 }
 
+export function hasRiskAssessment(report) {
+  const level = (report?.risk_level || report?.priority_level || "LOW").toUpperCase();
+  return level !== "LOW" || Boolean(report?.risk_reason);
+}
+
+/** @deprecated Use hasRiskAssessment */
 export function hasAiAnalysis(report) {
-  const status = (report?.ai_analysis_status || "").toLowerCase();
-  return status === "analyzed" || status === "fallback" || status === "failed";
+  return hasRiskAssessment(report);
+}
+
+/** @deprecated Use isPriorityReport */
+export function isAiPriorityReport(report) {
+  return isPriorityReport(report);
 }
 
 export function getCriticalLevelClass(level) {

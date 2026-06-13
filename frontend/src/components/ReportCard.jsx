@@ -5,7 +5,7 @@ import {
   formatPriorityLevel,
   getCriticalLevelClass,
   getReportSuggestedUnits,
-  hasAiAnalysis,
+  hasRiskAssessment,
 } from "../utils/reportPriority";
 
 function formatReportDate(iso) {
@@ -24,17 +24,14 @@ export default function ReportCard({
   report,
   token,
   actions,
-  showAiPriority = true,
+  showPriorityInfo = true,
   unitResponses = [],
 }) {
   const suggestedUnits = getReportSuggestedUnits(report);
   const isMultiAgency = suggestedUnits.length >= 2;
-  const isCritical = (report.critical_level || "").toUpperCase() === "CRITICAL";
-  const showAi = showAiPriority && hasAiAnalysis(report);
-  const aiSuggestedUnits =
-    Array.isArray(report.suggested_units) && report.suggested_units.length
-      ? report.suggested_units
-      : [];
+  const riskLevel = (report.risk_level || report.critical_level || report.priority_level || "LOW").toUpperCase();
+  const isCritical = riskLevel === "CRITICAL";
+  const showRisk = showPriorityInfo && hasRiskAssessment(report);
 
   return (
     <article
@@ -51,26 +48,16 @@ export default function ReportCard({
           <span className="report-card__time">{formatReportDate(report.created_at)}</span>
         </div>
         <div className="report-card__badges">
-          {showAi && (report.critical_level || "").toUpperCase() !== "LOW" ? (
-            <span className={getCriticalLevelClass(report.critical_level)} title="Severity level">
-              {formatPriorityLevel(report.critical_level)}
+          {showRisk && riskLevel !== "LOW" ? (
+            <span className={getCriticalLevelClass(riskLevel)} title="Severity level">
+              {formatPriorityLevel(riskLevel)}
             </span>
           ) : null}
           {report.is_priority ? <span className="priority-badge">Priority</span> : null}
-          {report.detected_incident_type ? (
-            <span className="incident-type-badge">{report.detected_incident_type}</span>
-          ) : null}
-          {aiSuggestedUnits.length ? (
+          {suggestedUnits.length ? (
             <span
               className="suggested-units-badge"
-              title="Suggested units — manual response required"
-            >
-              Suggested units: {aiSuggestedUnits.join(", ")}
-            </span>
-          ) : suggestedUnits.length ? (
-            <span
-              className="suggested-units-badge suggested-units-badge--legacy"
-              title="Keyword-based suggestion only — manual response required"
+              title="Keyword-based suggestion — manual response required"
             >
               Suggested: {suggestedUnits.join(", ")}
             </span>
@@ -83,13 +70,10 @@ export default function ReportCard({
 
       <p className="report-card__description">{report.emergency_description}</p>
 
-      {showAi && report.ai_priority_reason ? (
+      {showRisk && report.risk_reason ? (
         <div className="report-card__ai-reason">
           <p className="report-card__ai-reason-label">Priority reason</p>
-          <p>{report.ai_priority_reason}</p>
-          {typeof report.ai_confidence === "number" ? (
-            <p className="report-card__ai-confidence">Review score: {report.ai_confidence}%</p>
-          ) : null}
+          <p>{report.risk_reason}</p>
         </div>
       ) : null}
 
